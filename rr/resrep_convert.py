@@ -62,6 +62,16 @@ def fold_conv(fused_k, fused_b, thresh, compactor_mat):
 
 
 def compactor_convert(model, origin_deps, thresh, pacesetter_dict, succ_strategy, save_path):
+    '''
+    实现结构转换？
+    :param model:
+    :param origin_deps:
+    :param thresh:
+    :param pacesetter_dict:
+    :param succ_strategy:
+    :param save_path:
+    :return:
+    '''
     compactor_mats = {}
     for submodule in model.modules():
         if hasattr(submodule, 'conv_idx'):
@@ -74,12 +84,13 @@ def compactor_convert(model, origin_deps, thresh, pacesetter_dict, succ_strategy
 
     kernel_name_list = []
     save_dict = {}
+    #保存参数名字和值
     for k, v in model.state_dict().items():
         v = v.detach().cpu().numpy()
         if v.ndim in [2, 4] and 'compactor.pwc' not in k and 'align_opr.pwc' not in k:
             kernel_name_list.append(k)
         save_dict[k] = v
-
+    #获得每个卷积对应的kernel参数
     for conv_id, kernel_name in enumerate(kernel_name_list):
         kernel_value = save_dict[kernel_name]
         if kernel_value.ndim == 2:

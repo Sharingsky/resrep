@@ -111,7 +111,8 @@ def resrep_train_main(
         # ----------------------------- build model ------------------------------
         if net is None:
             net_fn = get_model_fn(cfg.dataset_name, cfg.network_type)
-            model = net_fn(cfg, resrep_builder)
+            model = net_fn(cfg, resrep_builder)#上一行最后return SRCNet需要cfg和builder参数
+                                                #这里的builder和base的builder不一样
         else:
             model = net
         model = model.cuda()

@@ -83,6 +83,7 @@ class ResNetBasicStage(nn.Module):
         super(ResNetBasicStage, self).__init__()
         print('building stage: in {}, deps {}'.format(in_planes, stage_deps))
         self.num_blocks = len(stage_deps) // 2
+        #两个数字组一个layer
 
         stage_out_channels = stage_deps[0]
         for i in range(0, self.num_blocks):
@@ -206,7 +207,8 @@ class SRCNet(nn.Module):
         assert block_counts[0] == block_counts[1]
         assert block_counts[1] == block_counts[2]
         if deps is None:
-            deps = rc_origin_deps_flattened(block_counts[0])
+            deps = rc_origin_deps_flattened(block_counts[0])#deps：总深度，总共3个stage，这里确定每个stage深度
+
 
         assert len(deps) == block_counts[0] * 6 + 3
         filters_per_stage = len(deps) // 3
