@@ -2,7 +2,8 @@ import torch
 import torch.nn.init as init
 from torch.nn import Conv2d
 import numpy as np
-
+import torchvision
+logpath = 'D:/_1work/pycharmcode/pycharmproject/resrep/compactorout_log.txt'
 class CompactorLayer(torch.nn.Module):
 
     def __init__(self, num_features, conv_idx, ):
@@ -17,7 +18,8 @@ class CompactorLayer(torch.nn.Module):
         self.num_features = num_features
 
     def forward(self, inputs):
-        return self.pwc(inputs)
+        out = self.pwc(inputs)
+        return out
 
 
     def set_mask(self, zero_indices):

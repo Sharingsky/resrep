@@ -11,6 +11,7 @@ def _fuse_kernel(kernel, gamma, running_var, eps):
     t = np.reshape(t, (-1, 1, 1, 1))
     print('fusing: t', t.shape)
     t = np.tile(t, (1, kernel.shape[1], kernel.shape[2], kernel.shape[3]))
+    #tile:沿不同的轴复制
     return kernel * t
 
 def _fuse_bias(running_mean, running_var, gamma, beta, eps, bias=None):
@@ -19,7 +20,7 @@ def _fuse_bias(running_mean, running_var, gamma, beta, eps, bias=None):
     else:
         return beta + (bias - running_mean) * gamma / np.sqrt(running_var + eps)
 
-def fuse_conv_bn(save_dict, pop_name_set, kernel_name):
+def fuse_conv_bn(save_dict, pop_name_set, kernel_name):#fuse是融合的意思
     mean_name = kernel_name.replace('.conv.weight', '.bn.running_mean')
     var_name = kernel_name.replace('.conv.weight', '.bn.running_var')
     gamma_name = kernel_name.replace('.conv.weight', '.bn.weight')
@@ -39,7 +40,7 @@ def fuse_conv_bn(save_dict, pop_name_set, kernel_name):
 
 def fold_conv(fused_k, fused_b, thresh, compactor_mat):
     metric_vec = np.sqrt(np.sum(compactor_mat ** 2, axis=(1, 2, 3)))
-    filter_ids_below_thresh = np.where(metric_vec < thresh)[0]
+    filter_ids_below_thresh = np.where(metric_vec < thresh)[0]#阈值以下的filter
 
     if len(filter_ids_below_thresh) == len(metric_vec):
         sortd_ids = np.argsort(metric_vec)
@@ -76,6 +77,7 @@ def compactor_convert(model, origin_deps, thresh, pacesetter_dict, succ_strategy
     for submodule in model.modules():
         if hasattr(submodule, 'conv_idx'):
             compactor_mats[submodule.conv_idx] = submodule.pwc.weight.detach().cpu().numpy()
+            #detach不计算梯度，对应原始卷积？
 
     pruned_deps = np.array(origin_deps)
 

@@ -97,7 +97,7 @@ class ResNetBasicStage(nn.Module):
                                                kernel_size=1, stride=stride)
 
         self.relu = builder.ReLU()
-        self.align_opr = builder.ResNetAlignOpr(channels=stage_out_channels)
+        self.align_opr = builder.ResNetAlignOpr(channels=stage_out_channels)#identity
 
         for i in range(self.num_blocks):
             if i == 0 and is_first:
@@ -107,7 +107,7 @@ class ResNetBasicStage(nn.Module):
             else:
                 in_c = stage_out_channels
             block_stride = stride if i == 0 else 1
-            self.__setattr__('block{}'.format(i), BasicBranch(builder=builder,
+            self.__setattr__('block{}'.format(i), BasicBranch(builder=builder,#主要是建了一个branch
                             in_channels=in_c, deps=stage_deps[1 + i*2: 3 + i*2],
                             stride=block_stride))
 
