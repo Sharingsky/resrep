@@ -83,7 +83,7 @@ class ResNetBasicStage(nn.Module):
         super(ResNetBasicStage, self).__init__()
         print('building stage: in {}, deps {}'.format(in_planes, stage_deps))
         self.num_blocks = len(stage_deps) // 2
-        #两个数字组一个layer
+        #两个数字组一个block
 
         stage_out_channels = stage_deps[0]
         for i in range(0, self.num_blocks):

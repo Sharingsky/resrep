@@ -110,7 +110,7 @@ def compactor_convert(model, origin_deps, thresh, pacesetter_dict, succ_strategy
             pruned_deps[cur_conv_idx] -= len(pruned_ids)
             print('pruned ids: ', pruned_ids)
             if len(pruned_ids) > 0 and conv_id in succ_strategy:
-                followers = succ_strategy[conv_id]
+                followers = succ_strategy[conv_id]#和shortcut有关
                 if type(followers) is not list:
                     followers = [followers]
                 for fo in followers:

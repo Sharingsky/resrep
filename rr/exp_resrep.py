@@ -61,7 +61,7 @@ if __name__ == '__main__':
         succeeding_strategy = rc_succeeding_strategy(9)
         pacesetter_dict = rc_pacesetter_dict(9)
         flops_func = calculate_rc56_flops
-        init_hdf5 = 'D:/_1work/pycharmcode/pycharmproject/resrep/src56_train/finish.hdf5'
+        init_hdf5 = 'D:/_1work/pycharmcode/pycharmproject/resrep/rr/finish_converted.hdf5'
         target_layers = rc_internal_layers(9)
         lrs = LRSchedule(base_lr=0.01, max_epochs=480, lr_epoch_boundaries=None, lr_decay_factor=None,
                          linear_final_lr=None, cosine_minimum=0)

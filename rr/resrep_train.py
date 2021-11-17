@@ -32,7 +32,8 @@ def train_one_step(compactor_mask_dict, resrep_config:ResRepConfig,
     loss = criterion(pred, label)
     loss.backward()
 
-    for compactor_param, mask in compactor_mask_dict.items():
+
+    for compactor_param, mask in compactor_mask_dict.items():#魔改的梯度mask
         compactor_param.grad.data = mask * compactor_param.grad.data
         lasso_grad = compactor_param.data * ((compactor_param.data ** 2).sum(dim=(1, 2, 3), keepdim=True) ** (-0.5))
                                                 #欧几里德范数
@@ -40,7 +41,7 @@ def train_one_step(compactor_mask_dict, resrep_config:ResRepConfig,
 
 
     if not if_accum_grad:
-        if gradient_mask_tensor is not None:#魔改的梯度mask
+        if gradient_mask_tensor is not None:
             for name, param in net.named_parameters():
                 if name in gradient_mask_tensor:
                     param.grad = param.grad * gradient_mask_tensor[name]
@@ -275,7 +276,7 @@ def resrep_train_main(
                 if iteration % cfg.tb_iter_period == 0:
                     for name, param in model.named_parameters():
                         if 'compactor' in name:
-                            tb_writer.add_image(name + "_model2", param.clone().reshape(1,param.size()[0],-1).cpu().data.numpy(), iteration)
+                            tb_writer.add_image(name + "_model1", param.clone().reshape(1,param.size()[0],-1).cpu().data.numpy(), iteration)
                     for tag, value in zip(tb_tags, [acc.item(), acc5.item(), loss.item()]):
                         tb_writer.add_scalars(tag, {'Train': value}, iteration)
 
