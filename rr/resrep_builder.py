@@ -2,7 +2,23 @@ from rr.resrep_config import ResRepConfig
 from builder import ConvBuilder
 from base_config import BaseConfigByEpoch
 import torch.nn as nn
+import torch
 from rr.compactor import CompactorLayer
+class Mlayer(nn.Module):
+    def __init__(self,in_channel,out_channel,stride=1):
+        super(Mlayer, self).__init__()
+        m_s = torch.zeros([1,in_channel,1,1],requires_grad=True)
+        self.m_s = torch.nn.Parameter(m_s)
+        self.register_parameter('m_scale', self.m_s)
+        self.func = nn.Identity()
+        if in_channel!=out_channel:
+            self.func = nn.Conv2d(in_channels=in_channel,out_channels=out_channel,
+                                  kernel_size=1,stride=stride,padding=0)
+
+    def forward(self, input):
+        x = input * self.m_s
+        x = self.func(x)
+        return x
 class LayerMaskBuilder(ConvBuilder):
 
     def __init__(self, base_config:BaseConfigByEpoch, resrep_config:ResRepConfig, mode='train'):
@@ -32,16 +48,17 @@ class LayerMaskBuilder(ConvBuilder):
                                                        padding=padding, dilation=dilation, groups=groups, padding_mode=padding_mode)
 
         else:
-
             se = self.Sequential()
+            se_main = self.Sequential()
             conv_layer = nn.Conv2d(in_channels=in_channels, out_channels=out_channels, kernel_size=kernel_size,
                                    stride=stride, padding=padding, dilation=dilation, groups=groups, bias=False,
                                    padding_mode=padding_mode)
-            se.add_module('conv', conv_layer)
+            se_main.add_module('conv', conv_layer)
             bn_layer = self.BatchNorm2d(num_features=out_channels)
-            se.add_module('bn', bn_layer)
-            if in_channels==out_channels:
-                se.add_module()
+            se_main.add_module('bn', bn_layer)
+            se_main.add_module('compactor', CompactorLayer(num_features=out_channels, conv_idx=self.cur_conv_idx))
+            se.add_module('se_main',se_main)
+            se.add_module('mlayer',Mlayer(in_channel=in_channels,out_channel=out_channels,stride=stride))
             return se
 class ResRepBuilder(ConvBuilder):
 
