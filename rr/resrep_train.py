@@ -32,7 +32,15 @@ def train_one_step(compactor_mask_dict, resrep_config:ResRepConfig,
     loss = criterion(pred, label)
     loss.backward()
 
-
+    # compalist = []
+    # for compadata in compactor_mask_dict.items():
+    #     compalist.append(compadata)
+    # for idx,para in enumerate(compalist):
+    #     if idx == len(compalist)-1:
+    #         break
+    #     compactor_param,mask = para
+    #     nex_compactor_param,nex_mask = compalist[idx+1]
+    #
     for compactor_param, mask in compactor_mask_dict.items():#魔改的梯度mask
         compactor_param.grad.data = mask * compactor_param.grad.data
         lasso_grad = compactor_param.data * ((compactor_param.data ** 2).sum(dim=(1, 2, 3), keepdim=True) ** (-0.5))
