@@ -88,8 +88,8 @@ def resrep_mask_model(origin_deps, resrep_config:ResRepConfig, model:nn.Module):
         # print('attempt flops ', attempt_flops)
         if attempt_flops <= resrep_config.flops_target * origin_flops:
             break
-        attempt_layer_filter = sorted_metric_dict[i]
-        if attempt_deps[attempt_layer_filter[0]] <= resrep_config.num_at_least:
+        attempt_layer_filter = sorted_metric_dict[i]#把第X层的第X个通道排序
+        if attempt_deps[attempt_layer_filter[0]] <= resrep_config.num_at_least:#如果减到了最小跳过
             skip_idx.append(i)
             i += 1
             continue
@@ -98,7 +98,7 @@ def resrep_mask_model(origin_deps, resrep_config:ResRepConfig, model:nn.Module):
         if resrep_config.pacesetter_dict is not None:
             for follower, pacesetter in resrep_config.pacesetter_dict.items():
                 if pacesetter == attempt_layer_filter[0] and pacesetter != follower:
-                    attempt_deps[follower] -= 1
+                    attempt_deps[follower] -= 1#对跳跃连接的一种同步
         i += 1
         if i >= next_deactivated_max:
             break

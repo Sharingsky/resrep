@@ -28,13 +28,25 @@ CONVERSION_EPSILON = 1e-5
 def train_one_step(compactor_mask_dict, resrep_config:ResRepConfig,
                    net, data, label, optimizer, criterion, if_accum_grad = False,
                    gradient_mask_tensor = None):
-    pred = net(data)
+    pred = net(data)#原网络
     loss = criterion(pred, label)
     loss.backward()
-    for compactor_param, mask in compactor_mask_dict.items():
+
+    # compalist = []
+    # for compadata in compactor_mask_dict.items():
+    #     compalist.append(compadata)
+    # for idx,para in enumerate(compalist):
+    #     if idx == len(compalist)-1:
+    #         break
+    #     compactor_param,mask = para
+    #     nex_compactor_param,nex_mask = compalist[idx+1]
+    #
+    for compactor_param, mask in compactor_mask_dict.items():#魔改的梯度mask
         compactor_param.grad.data = mask * compactor_param.grad.data
         lasso_grad = compactor_param.data * ((compactor_param.data ** 2).sum(dim=(1, 2, 3), keepdim=True) ** (-0.5))
-        compactor_param.grad.data.add_(resrep_config.lasso_strength, lasso_grad)
+                                                #欧几里德范数
+        compactor_param.grad.data.add_(resrep_config.lasso_strength, lasso_grad)#1e-4
+
 
     if not if_accum_grad:
         if gradient_mask_tensor is not None:
@@ -44,6 +56,7 @@ def train_one_step(compactor_mask_dict, resrep_config:ResRepConfig,
         optimizer.step()
         optimizer.zero_grad()
     acc, acc5 = torch_accuracy(pred, label, (1,5))
+
     return acc, acc5, loss
 
 def sgd_optimizer(cfg, resrep_config:ResRepConfig, model, no_l2_keywords, use_nesterov, keyword_to_lr_mult):
@@ -111,7 +124,8 @@ def resrep_train_main(
         # ----------------------------- build model ------------------------------
         if net is None:
             net_fn = get_model_fn(cfg.dataset_name, cfg.network_type)
-            model = net_fn(cfg, resrep_builder)
+            model = net_fn(cfg, resrep_builder)#上一行最后return SRCNet需要cfg和builder参数
+                                                #这里的builder和base的builder不一样
         else:
             model = net
         model = model.cuda()
@@ -233,7 +247,7 @@ def resrep_train_main(
                 if iteration > resrep_config.before_mask_iters:
                     total_iters_in_compactor_phase = iteration - resrep_config.before_mask_iters
                     if total_iters_in_compactor_phase > 0 and (total_iters_in_compactor_phase % resrep_config.mask_interval == 0):
-                        print('update mask at iter ', iteration)
+                        print('update mask at iter ', iteration)#经过一定阶段才会mask
                         resrep_mask_model(origin_deps=cfg.deps, resrep_config=resrep_config, model=model)
                         compactor_mask_dict = get_compactor_mask_dict(model=model)
                         unmasked_deps = resrep_get_unmasked_deps(origin_deps=cfg.deps, model=model, pacesetter_dict=resrep_config.pacesetter_dict)
@@ -266,9 +280,14 @@ def resrep_train_main(
                     if hasattr(module, 'set_cur_iter'):
                         module.set_cur_iter(iteration)
 
-                if iteration % cfg.tb_iter_period == 0 and engine.world_rank == 0:
+                # if iteration % cfg.tb_iter_period == 0 and engine.world_rank == 0:
+                if iteration % cfg.tb_iter_period == 0:
+                    for name, param in model.named_parameters():
+                        if 'compactor' in name:
+                            tb_writer.add_image(name + "_model1", param.clone().reshape(1,param.size()[0],-1).cpu().data.numpy(), iteration)
                     for tag, value in zip(tb_tags, [acc.item(), acc5.item(), loss.item()]):
                         tb_writer.add_scalars(tag, {'Train': value}, iteration)
+
 
                 top1.update(acc.item())
                 top5.update(acc5.item())

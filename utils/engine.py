@@ -13,7 +13,7 @@ from utils.pyt_utils import parse_torch_devices, extant_file, link_file, ensure_
 from utils.logger import get_logger
 from utils.checkpoint import load_model
 from utils.misc import read_hdf5, save_hdf5
-
+import re
 
 class State(object):
     def __init__(self):
@@ -263,8 +263,10 @@ class Engine(object):
         assigned_params = 0
         for k, v in self.state.model.named_parameters():
             new_k = k.replace(ignore_keyword, '')
+            new_k = re.sub(r'se_main.', r'', new_k)
             if new_k in hdf5_dict and (load_weights_keyword is None or load_weights_keyword in new_k):
                 self.echo('assign {} from hdf5'.format(k))
+                # new_k = re.sub(r'(block[0-9]+.conv[0-9]+.)', r'\1se_main.', new_k)
                 # print(k, v.size(), hdf5_dict[k])
                 self.set_value(v, hdf5_dict[new_k])
                 assigned_params += 1
@@ -272,6 +274,7 @@ class Engine(object):
                 self.echo('param {} not found in hdf5'.format(k))
         for k, v in self.state.model.named_buffers():
             new_k = k.replace(ignore_keyword, '')
+            new_k = re.sub(r'se_main.', r'', new_k)
             if new_k in hdf5_dict and (load_weights_keyword is None or load_weights_keyword in new_k):
                 self.set_value(v, hdf5_dict[new_k])
                 assigned_params += 1

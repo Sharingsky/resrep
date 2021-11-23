@@ -8,7 +8,7 @@ sys.path.extend([rootpath + i for i in os.listdir(rootpath) if i[0] != "."])  # 
 sys.path.extend(syspath)
 print(sys.path)
 from constantsa import *
-from rr.resrep_builder import ResRepBuilder
+from rr.resrep_builder import ResRepBuilder,LayerMaskBuilder
 from rr.resrep_config import ResRepConfig
 from rr.resrep_train import resrep_train_main
 from base_config import get_baseconfig_by_epoch
@@ -90,7 +90,7 @@ if __name__ == '__main__':
                                      tb_dir=log_dir, save_weights=None, val_epoch_period=2, linear_final_lr=lrs.linear_final_lr,
                                      weight_decay_bias=weight_decay_bias, deps=deps)
 
-    resrep_builder = ResRepBuilder(base_config=config, resrep_config=resrep_config)
+    resrep_builder = LayerMaskBuilder(base_config=config, resrep_config=resrep_config)
 
     if resrep_config.weight_decay_on_compactor:
         no_l2_keywords = ['depth']

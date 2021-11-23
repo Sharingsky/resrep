@@ -37,7 +37,10 @@ class BasicBranch(nn.Module):
         self.conv2 = builder.Conv2dBN(deps[0], deps[1], kernel_size=3, stride=1, padding=1)
 
     def forward(self, x):
-        return self.conv2(self.conv1(x))
+        shot1 = self.conv1.mlayer(x)
+        x = self.conv1.se_main(x)+shot1
+        x = self.conv2(x)
+        return x
 
 
 class ResNetBottleneckStage(nn.Module):
@@ -83,6 +86,7 @@ class ResNetBasicStage(nn.Module):
         super(ResNetBasicStage, self).__init__()
         print('building stage: in {}, deps {}'.format(in_planes, stage_deps))
         self.num_blocks = len(stage_deps) // 2
+        #两个数字组一个block
 
         stage_out_channels = stage_deps[0]
         for i in range(0, self.num_blocks):
@@ -96,7 +100,7 @@ class ResNetBasicStage(nn.Module):
                                                kernel_size=1, stride=stride)
 
         self.relu = builder.ReLU()
-        self.align_opr = builder.ResNetAlignOpr(channels=stage_out_channels)
+        self.align_opr = builder.ResNetAlignOpr(channels=stage_out_channels)#identity
 
         for i in range(self.num_blocks):
             if i == 0 and is_first:
@@ -106,7 +110,7 @@ class ResNetBasicStage(nn.Module):
             else:
                 in_c = stage_out_channels
             block_stride = stride if i == 0 else 1
-            self.__setattr__('block{}'.format(i), BasicBranch(builder=builder,
+            self.__setattr__('block{}'.format(i), BasicBranch(builder=builder,#主要是建了一个branch
                             in_channels=in_c, deps=stage_deps[1 + i*2: 3 + i*2],
                             stride=block_stride))
 
@@ -206,7 +210,8 @@ class SRCNet(nn.Module):
         assert block_counts[0] == block_counts[1]
         assert block_counts[1] == block_counts[2]
         if deps is None:
-            deps = rc_origin_deps_flattened(block_counts[0])
+            deps = rc_origin_deps_flattened(block_counts[0])#deps：总深度，总共3个stage，这里确定每个stage深度
+
 
         assert len(deps) == block_counts[0] * 6 + 3
         filters_per_stage = len(deps) // 3
