@@ -67,6 +67,9 @@ def resrep_mask_model(origin_deps, resrep_config:ResRepConfig, model:nn.Module):
                                                             pacesetter_dict=resrep_config.pacesetter_dict)
     # print(valve_dict)
     sorted_metric_dict = sorted(metric_dict, key=metric_dict.get)
+    #metric_vector = torch.sqrt(torch.sum(self.get_pwc_kernel_detach() ** 2, dim=(1, 2, 3))).cpu().numpy()
+    #所有通道的一个二元元组数组，1008个，第0位是层编号，第1位是通道编号，当然都是有compactor的，所以没有2，4，6等层
+    #.get获得对应的值
     # print(sorted_valve_dict)
     # print(sorted_metric_dict)
 
@@ -88,7 +91,7 @@ def resrep_mask_model(origin_deps, resrep_config:ResRepConfig, model:nn.Module):
         # print('attempt flops ', attempt_flops)
         if attempt_flops <= resrep_config.flops_target * origin_flops:
             break
-        attempt_layer_filter = sorted_metric_dict[i]#把第X层的第X个通道排序
+        attempt_layer_filter = sorted_metric_dict[i]
         if attempt_deps[attempt_layer_filter[0]] <= resrep_config.num_at_least:#如果减到了最小跳过
             skip_idx.append(i)
             i += 1
@@ -111,7 +114,7 @@ def resrep_mask_model(origin_deps, resrep_config:ResRepConfig, model:nn.Module):
     set_model_masks(model, layer_masked_out_filters)
 
 
-def get_compactor_mask_dict(model:nn.Module):
+def get_compactor_mask_dict(model:nn.Module):#构造mask字典
     compactor_name_to_mask = {}
     compactor_name_to_kernel_param = {}
     for name, buffer in model.named_buffers():

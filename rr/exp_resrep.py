@@ -22,7 +22,7 @@ from ndp_test import general_test
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('-a', '--arch', default='src56')
+    parser.add_argument('-a', '--arch', default='src56_small')
     parser.add_argument('-c', '--conti_or_fs', default='fs')
     parser.add_argument(
         '--local_rank', default=0, type=int,
@@ -55,6 +55,22 @@ if __name__ == '__main__':
                                      begin_granularity=4, weight_decay_on_compactor=False, num_at_least=1)
 
     elif network_type == 'src56':
+        weight_decay_strength = 1e-4
+        batch_size = 64
+        deps = rc_origin_deps_flattened(9)
+        succeeding_strategy = rc_succeeding_strategy(9)
+        pacesetter_dict = rc_pacesetter_dict(9)
+        flops_func = calculate_rc56_flops
+        init_hdf5 = 'D:/_1work/pycharmcode/pycharmproject/resrep/src56_train/finish.hdf5'
+        target_layers = rc_internal_layers(9)
+        lrs = LRSchedule(base_lr=0.01, max_epochs=480, lr_epoch_boundaries=None, lr_decay_factor=None,
+                         linear_final_lr=None, cosine_minimum=0)
+        resrep_config = ResRepConfig(target_layers=target_layers, succeeding_strategy=succeeding_strategy,
+                                     pacesetter_dict=pacesetter_dict, lasso_strength=1e-4,
+                                     flops_func=flops_func, flops_target=0.471, mask_interval=200,
+                                     compactor_momentum=0.99, before_mask_iters=5 * 50000 // batch_size,
+                                     begin_granularity=4, weight_decay_on_compactor=False, num_at_least=1)
+    elif network_type == 'src56_small':
         weight_decay_strength = 1e-4
         batch_size = 64
         deps = rc_origin_deps_flattened(9)

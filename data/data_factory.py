@@ -4,7 +4,7 @@ import numpy as np
 from data.dataset_util import InfiniteDataLoader
 
 CIFAR10_PATH = 'D:/_1work/pycharmcode'
-MNIST_PATH = 'mnist_data'
+MNIST_PATH = 'D:/_1work/MNIST'
 
 
 def load_cuda_data(data_loader, dataset_name):
@@ -37,7 +37,7 @@ class ImageNetBlankGenerator(object):
 
 def create_dataset(dataset_name, subset, global_batch_size, distributed):
     assert dataset_name in ['cifar10','imagenet_blank',
-                            'imagenet_standard', 'mnist']
+                            'imagenet_standard', 'mnist','cifar10_small']
     assert subset in ['train', 'val']
 
     if dataset_name == 'imagenet_standard':
@@ -84,6 +84,27 @@ def create_dataset(dataset_name, subset, global_batch_size, distributed):
                                     transforms.ToTensor(),
                                     transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])),
                                 batch_size=global_batch_size, shuffle=False)
+    elif dataset_name == 'cifar10_small':
+        assert not distributed
+        wholedata =datasets.CIFAR10(CIFAR10_PATH, train=True, download=False,
+                               transform=transforms.Compose([
+                                   transforms.Pad(padding=(4, 4, 4, 4)),
+                                   transforms.RandomCrop(32),
+                                   transforms.RandomHorizontalFlip(),
+                                   transforms.ToTensor(),
+                                   transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]))
+        from torch.utils.data import random_split, Subset
+        datalenth = len(wholedata)
+        trainsize = int(0.1*datalenth)
+        valsize = int(0.12*datalenth)
+        trainset = Subset(wholedata,range(trainsize))
+        testset = Subset(wholedata,range(trainsize,valsize))
+        if subset == 'train':
+            return InfiniteDataLoader(trainset,
+                                batch_size=global_batch_size, shuffle=True)
+        else:
+            return InfiniteDataLoader(testset,
+                                batch_size=global_batch_size, shuffle=False)
 
     else:
         raise ValueError('??')
@@ -93,7 +114,10 @@ def num_train_examples_per_epoch(dataset_name):
     if 'imagenet' in dataset_name:
         return 1281167
     elif dataset_name in ['cifar10', 'ch']:
+
         return 50000
+    elif dataset_name in ['cifar10_small']:
+        return 5000
     elif dataset_name == 'mnist':
         return 60000
     else:
@@ -105,6 +129,8 @@ def num_iters_per_epoch(cfg):
 def num_val_examples(dataset_name):
     if 'imagenet' in dataset_name:
         return 50000
+    elif dataset_name in ['cifar10_small']:
+        return 1000
     elif dataset_name in ['cifar10', 'ch', 'mnist']:
         return 10000
     else:

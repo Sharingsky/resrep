@@ -41,9 +41,13 @@ def train_one_step(compactor_mask_dict, resrep_config:ResRepConfig,
     #     compactor_param,mask = para
     #     nex_compactor_param,nex_mask = compalist[idx+1]
     #
+    #TODO 实现魔改的层mask
+    #1.初始化mask为1
+    #2.以bn系数y作为重要性指标进行排序
+    #3.对最不重要的层进行mask，
     for compactor_param, mask in compactor_mask_dict.items():#魔改的梯度mask
         compactor_param.grad.data = mask * compactor_param.grad.data
-        lasso_grad = compactor_param.data * ((compactor_param.data ** 2).sum(dim=(1, 2, 3), keepdim=True) ** (-0.5))
+        lasso_grad = compactor_param.data * ((compactor_param.data ** 2).sum(dim=(0,1, 2, 3), keepdim=True) ** (-0.5))
                                                 #欧几里德范数
         compactor_param.grad.data.add_(resrep_config.lasso_strength, lasso_grad)#1e-4
 
@@ -134,7 +138,7 @@ def resrep_train_main(
         # ---------------------------- prepare data -------------------------
         if train_dataloader is None:
             train_data = create_dataset(cfg.dataset_name, cfg.dataset_subset,
-                                        cfg.global_batch_size, distributed=engine.distributed)
+                                            cfg.global_batch_size, distributed=engine.distributed)
         if cfg.val_epoch_period > 0 and val_dataloader is None:
             val_data = create_dataset(cfg.dataset_name, 'val',
                                       global_batch_size=100, distributed=False)

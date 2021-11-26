@@ -97,7 +97,7 @@ def compactor_convert(model, origin_deps, thresh, pacesetter_dict, succ_strategy
         kernel_value = save_dict[kernel_name]
         if kernel_value.ndim == 2:
             continue
-        fused_k, fused_b = fuse_conv_bn(save_dict, pop_name_set, kernel_name)
+        fused_k, fused_b = fuse_conv_bn(save_dict, pop_name_set, kernel_name)#把bn融到卷积里
         cur_conv_idx += 1
         fold_direct = cur_conv_idx in compactor_mats
         fold_follower = (pacesetter_dict is not None and cur_conv_idx in pacesetter_dict and pacesetter_dict[cur_conv_idx] in compactor_mats)
@@ -106,7 +106,7 @@ def compactor_convert(model, origin_deps, thresh, pacesetter_dict, succ_strategy
                 fm = compactor_mats[cur_conv_idx]
             else:
                 fm = compactor_mats[pacesetter_dict[cur_conv_idx]]
-            fused_k, fused_b, pruned_ids = fold_conv(fused_k, fused_b, thresh, fm)
+            fused_k, fused_b, pruned_ids = fold_conv(fused_k, fused_b, thresh, fm)#压缩卷积的通道
             pruned_deps[cur_conv_idx] -= len(pruned_ids)
             print('pruned ids: ', pruned_ids)
             if len(pruned_ids) > 0 and conv_id in succ_strategy:
