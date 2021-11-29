@@ -45,9 +45,11 @@ def train_one_step(compactor_mask_dict, resrep_config:ResRepConfig,
     #1.初始化mask为1
     #2.以bn系数y作为重要性指标进行排序
     #3.对最不重要的层进行mask，
+    # for compactor_param,layer_mask in my_mask_dict:
+
     for compactor_param, mask in compactor_mask_dict.items():#魔改的梯度mask
         compactor_param.grad.data = mask * compactor_param.grad.data
-        lasso_grad = compactor_param.data * ((compactor_param.data ** 2).sum(dim=(0,1, 2, 3), keepdim=True) ** (-0.5))
+        lasso_grad = compactor_param.data * ((compactor_param.data ** 2).sum(dim=(1, 2, 3), keepdim=True) ** (-0.5))
                                                 #欧几里德范数
         compactor_param.grad.data.add_(resrep_config.lasso_strength, lasso_grad)#1e-4
 
@@ -252,7 +254,7 @@ def resrep_train_main(
                     total_iters_in_compactor_phase = iteration - resrep_config.before_mask_iters
                     if total_iters_in_compactor_phase > 0 and (total_iters_in_compactor_phase % resrep_config.mask_interval == 0):
                         print('update mask at iter ', iteration)#经过一定阶段才会mask
-                        resrep_mask_model(origin_deps=cfg.deps, resrep_config=resrep_config, model=model)
+                        resrep_mask_model(origin_deps=cfg.deps, resrep_config=resrep_config, model=model)#修改了compactor的mask参数
                         compactor_mask_dict = get_compactor_mask_dict(model=model)
                         unmasked_deps = resrep_get_unmasked_deps(origin_deps=cfg.deps, model=model, pacesetter_dict=resrep_config.pacesetter_dict)
                         engine.log('iter {}, unmasked deps {}'.format(iteration, list(unmasked_deps)))

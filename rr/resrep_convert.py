@@ -6,6 +6,8 @@ from utils.misc import save_hdf5
 
 def _fuse_kernel(kernel, gamma, running_var, eps):
     print('fusing: kernel shape', kernel.shape)
+    if kernel.shape[3]==1:
+        return
     std = np.sqrt(running_var + eps)
     t = gamma / std
     t = np.reshape(t, (-1, 1, 1, 1))
@@ -28,7 +30,7 @@ def fuse_conv_bn(save_dict, pop_name_set, kernel_name):#fuse是融合的意思
     pop_name_set.add(mean_name)
     pop_name_set.add(var_name)
     pop_name_set.add(gamma_name)
-    pop_name_set.add(beta_name)
+    pop_name_set.add(beta_name)#把bn的参数名加入丢弃集
     mean = save_dict[mean_name]
     var = save_dict[var_name]
     gamma = save_dict[gamma_name]
@@ -38,10 +40,9 @@ def fuse_conv_bn(save_dict, pop_name_set, kernel_name):#fuse是融合的意思
     print('kernel, mean, var, gamma, beta', kernel_value.shape, mean.shape, var.shape, gamma.shape, beta.shape)
     return _fuse_kernel(kernel_value, gamma, var, eps=1e-5), _fuse_bias(mean, var, gamma, beta, eps=1e-5)
 
-def fold_conv(fused_k, fused_b, thresh, compactor_mat):
+def fold_conv(fused_k, fused_b, thresh, compactor_mat):#当前或下一个compactor_mat
     metric_vec = np.sqrt(np.sum(compactor_mat ** 2, axis=(1, 2, 3)))
     filter_ids_below_thresh = np.where(metric_vec < thresh)[0]#阈值以下的filter
-
     if len(filter_ids_below_thresh) == len(metric_vec):
         sortd_ids = np.argsort(metric_vec)
         filter_ids_below_thresh = sortd_ids[:-1]    #TODO preserve at least one filter
@@ -89,7 +90,7 @@ def compactor_convert(model, origin_deps, thresh, pacesetter_dict, succ_strategy
     #保存参数名字和值
     for k, v in model.state_dict().items():
         v = v.detach().cpu().numpy()
-        if v.ndim in [2, 4] and 'compactor.pwc' not in k and 'align_opr.pwc' not in k:
+        if v.ndim in [2, 4] and 'compactor.pwc' not in k and 'align_opr.pwc' not in k and 'conv1shot' not in k:
             kernel_name_list.append(k)
         save_dict[k] = v
     #获得每个卷积对应的kernel参数
