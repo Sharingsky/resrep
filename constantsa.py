@@ -87,7 +87,14 @@ def rc_pacesetter_idxes(n):
     filters_in_each_stage = n * 2 + 1
     pacesetters = [0, int(filters_in_each_stage), int(2 * filters_in_each_stage)]
     return pacesetters
-
+def my_rc_internal_layers(n):
+    assert n in [3, 9, 12, 18, 27, 200]
+    pacesetters = rc_pacesetter_idxes(n)
+    result = []
+    for ps in pacesetters:
+        for i in range(n*2):
+            result.append(ps + 1 + i)
+    return result
 def rc_internal_layers(n):
     assert n in [3, 9, 12, 18, 27, 200]
     pacesetters = rc_pacesetter_idxes(n)

@@ -2,6 +2,7 @@ import torch.nn as nn
 import numpy as np
 from collections import defaultdict
 from rr.resrep_config import ResRepConfig
+import torch
 
 #   pacesetter is not included here
 def resrep_get_layer_mask_ones_and_metric_dict(model:nn.Module):
@@ -112,8 +113,19 @@ def resrep_mask_model(origin_deps, resrep_config:ResRepConfig, model:nn.Module):
             layer_masked_out_filters[sorted_metric_dict[k][0]].append(sorted_metric_dict[k][1])
 
     set_model_masks(model, layer_masked_out_filters)
-
-
+def get_bn_scale(model:nn.Module):
+    bn_scale_dict={}
+    for name,param in model.named_parameters():
+        if 'se_main.bn.weight' in name:
+            bn_scale_dict[name]=param
+    return bn_scale_dict
+def get_m_s_dict(model:nn.Module):
+    m_s_dict= {}
+    for name,param in model.named_parameters():
+        if 'm_s' in name:
+            m_s_dict[name]=param
+    # m_s_dict=torch.autograd.Variable(torch.Tensor(m_s_dict))
+    return m_s_dict
 def get_compactor_mask_dict(model:nn.Module):#构造mask字典
     compactor_name_to_mask = {}
     compactor_name_to_kernel_param = {}

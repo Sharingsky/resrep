@@ -25,10 +25,16 @@ TEST_BATCH_SIZE = 100
 
 CONVERSION_EPSILON = 1e-5
 
-def train_one_step(compactor_mask_dict, resrep_config:ResRepConfig,
+# def train_one_step(compactor_mask_dict, resrep_config:ResRepConfig,
+#                    net, data, label, optimizer, criterion, if_accum_grad = False,
+#                    gradient_mask_tensor = None):
+def train_one_step(m_s_dict, resrep_config:ResRepConfig,
                    net, data, label, optimizer, criterion, if_accum_grad = False,
                    gradient_mask_tensor = None):
     pred = net(data)#原网络
+    # m_slist = []
+    # for name,value in m_s_dict.items():
+    #     m_slist.append(abs(value))
     loss = criterion(pred, label)
     loss.backward()
 
@@ -46,12 +52,18 @@ def train_one_step(compactor_mask_dict, resrep_config:ResRepConfig,
     #2.以bn系数y作为重要性指标进行排序
     #3.对最不重要的层进行mask，
     # for compactor_param,layer_mask in my_mask_dict:
-
-    for compactor_param, mask in compactor_mask_dict.items():#魔改的梯度mask
-        compactor_param.grad.data = mask * compactor_param.grad.data
-        lasso_grad = compactor_param.data * ((compactor_param.data ** 2).sum(dim=(1, 2, 3), keepdim=True) ** (-0.5))
-                                                #欧几里德范数
-        compactor_param.grad.data.add_(resrep_config.lasso_strength, lasso_grad)#1e-4
+    # for name,ms in m_s_dict.items():
+    #     lasso_grad = abs(ms)
+    #     ms.grad.data.add_(1e-2, lasso_grad)
+    for name,value in m_s_dict.items():
+        lasso_grad = value.data/(value.data**2)**0.5
+        # if
+        value.grad.data.add_(1e-2,lasso_grad)
+    # for compactor_param, mask in compactor_mask_dict.items():#魔改的梯度mask
+    #     compactor_param.grad.data = mask * compactor_param.grad.data
+    #     lasso_grad = compactor_param.data * ((compactor_param.data ** 2).sum(dim=(1, 2, 3), keepdim=True) ** (-0.5))
+    #                                             #欧几里德范数
+    #     compactor_param.grad.data.add_(resrep_config.lasso_strength, lasso_grad)#1e-4
 
 
     if not if_accum_grad:
@@ -254,8 +266,9 @@ def resrep_train_main(
                     total_iters_in_compactor_phase = iteration - resrep_config.before_mask_iters
                     if total_iters_in_compactor_phase > 0 and (total_iters_in_compactor_phase % resrep_config.mask_interval == 0):
                         print('update mask at iter ', iteration)#经过一定阶段才会mask
-                        resrep_mask_model(origin_deps=cfg.deps, resrep_config=resrep_config, model=model)#修改了compactor的mask参数
-                        compactor_mask_dict = get_compactor_mask_dict(model=model)
+                        # resrep_mask_model(origin_deps=cfg.deps, resrep_config=resrep_config, model=model)#修改了compactor的mask参数
+                        # compactor_mask_dict = get_compactor_mask_dict(model=model)
+
                         unmasked_deps = resrep_get_unmasked_deps(origin_deps=cfg.deps, model=model, pacesetter_dict=resrep_config.pacesetter_dict)
                         engine.log('iter {}, unmasked deps {}'.format(iteration, list(unmasked_deps)))
                         if total_iters_in_compactor_phase == resrep_config.mask_interval:
@@ -271,9 +284,15 @@ def resrep_train_main(
                 if_accum_grad = ((iteration % cfg.grad_accum_iters) != 0)
 
                 train_net_time_start = time.time()
-                acc, acc5, loss = train_one_step(compactor_mask_dict, resrep_config, model, data, label, optimizer,
-                                                 criterion,
-                                                 if_accum_grad, gradient_mask_tensor=gradient_mask_tensor)
+                m_s_dict = get_m_s_dict(model=model)
+                # bn_scale_dict = get_bn_scale(model=model)
+                # acc, acc5, loss = train_one_step(compactor_mask_dict, resrep_config, model, data, label, optimizer,
+                #                                  criterion,
+                #                                  if_accum_grad, gradient_mask_tensor=gradient_mask_tensor)
+                acc, acc5, loss = train_one_step(m_s_dict, resrep_config, model, data, label, optimizer,
+                                                                                  criterion,
+                                                                                  if_accum_grad, gradient_mask_tensor=gradient_mask_tensor)
+
                 train_net_time_end = time.time()
 
                 if iteration > TRAIN_SPEED_START * max_iters and iteration < TRAIN_SPEED_END * max_iters:
@@ -287,12 +306,17 @@ def resrep_train_main(
                         module.set_cur_iter(iteration)
 
                 # if iteration % cfg.tb_iter_period == 0 and engine.world_rank == 0:
+
                 if iteration % cfg.tb_iter_period == 0:
                     for name, param in model.named_parameters():
                         if 'compactor' in name:
                             tb_writer.add_image(name + "_model1", param.clone().reshape(1,param.size()[0],-1).cpu().data.numpy(), iteration)
                     for tag, value in zip(tb_tags, [acc.item(), acc5.item(), loss.item()]):
                         tb_writer.add_scalars(tag, {'Train': value}, iteration)
+                    for name,value in m_s_dict.items():
+                        tb_writer.add_scalars(name,{'bn':value
+                        },iteration)
+
 
 
                 top1.update(acc.item())

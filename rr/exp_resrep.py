@@ -8,7 +8,7 @@ sys.path.extend([rootpath + i for i in os.listdir(rootpath) if i[0] != "."])  # 
 sys.path.extend(syspath)
 print(sys.path)
 from constantsa import *
-from rr.resrep_builder import ResRepBuilder,LayerMaskBuilder,Conv1ShotBuilder
+from rr.resrep_builder import ResRepBuilder,LayerMaskBuilder,Conv1ShotBuilder,LayerPruneBuilder
 from rr.resrep_config import ResRepConfig
 from rr.resrep_train import resrep_train_main
 from base_config import get_baseconfig_by_epoch
@@ -62,7 +62,7 @@ if __name__ == '__main__':
         pacesetter_dict = rc_pacesetter_dict(9)
         flops_func = calculate_rc56_flops
         init_hdf5 = 'D:/_1work/pycharmcode/pycharmproject/resrep/src56_train/finish.hdf5'
-        target_layers = rc_internal_layers(9)
+        target_layers = my_rc_internal_layers(9)
         lrs = LRSchedule(base_lr=0.01, max_epochs=480, lr_epoch_boundaries=None, lr_decay_factor=None,
                          linear_final_lr=None, cosine_minimum=0)
         resrep_config = ResRepConfig(target_layers=target_layers, succeeding_strategy=succeeding_strategy,
@@ -78,8 +78,8 @@ if __name__ == '__main__':
         pacesetter_dict = rc_pacesetter_dict(9)
         flops_func = calculate_rc56_flops
         init_hdf5 = 'D:/_1work/pycharmcode/pycharmproject/resrep/src56_train/finish.hdf5'
-        target_layers = rc_internal_layers(9)
-        lrs = LRSchedule(base_lr=0.01, max_epochs=20, lr_epoch_boundaries=None, lr_decay_factor=None,
+        target_layers = my_rc_internal_layers(9)
+        lrs = LRSchedule(base_lr=0.01, max_epochs=200, lr_epoch_boundaries=None, lr_decay_factor=None,
                          linear_final_lr=None, cosine_minimum=0)
         resrep_config = ResRepConfig(target_layers=target_layers, succeeding_strategy=succeeding_strategy,
                                      pacesetter_dict=pacesetter_dict, lasso_strength=1e-4,
@@ -106,7 +106,7 @@ if __name__ == '__main__':
                                      tb_dir=log_dir, save_weights=None, val_epoch_period=2, linear_final_lr=lrs.linear_final_lr,
                                      weight_decay_bias=weight_decay_bias, deps=deps)
 
-    resrep_builder = Conv1ShotBuilder(base_config=config, resrep_config=resrep_config)
+    resrep_builder = LayerPruneBuilder(base_config=config, resrep_config=resrep_config)
 
     if resrep_config.weight_decay_on_compactor:
         no_l2_keywords = ['depth']
