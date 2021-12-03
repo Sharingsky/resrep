@@ -3,6 +3,7 @@ import numpy as np
 from collections import defaultdict
 from rr.resrep_config import ResRepConfig
 import torch
+from rr.resrep_builder import Mlayer
 
 #   pacesetter is not included here
 def resrep_get_layer_mask_ones_and_metric_dict(model:nn.Module):
@@ -29,6 +30,28 @@ def set_model_masks(model, layer_masked_out_filters):
     for child_module in model.modules():
         if hasattr(child_module, 'conv_idx') and child_module.conv_idx in layer_masked_out_filters:
             child_module.set_mask(layer_masked_out_filters[child_module.conv_idx])
+def mask_target_mlayer(target_m_idx,model:nn.Module):
+    for child_model in model.modules():
+        if hasattr(child_model,'mlayeridx') and child_model.mlayeridx==target_m_idx:
+            child_model.M_mask=torch.tensor(0,dtype=torch.int32).cuda()
+            print(1)
+def get_ms_order(cur_mask_times,model:nn.Module):
+    mlayer_lis =[]
+    for childmodel in model.modules():
+        if hasattr(childmodel,'m_s'):
+            mlayer_lis.append(childmodel)
+    sorted_ml_lis = sorted(mlayer_lis,key=lambda x:abs(x.m_s.data))
+    for member in sorted_ml_lis:
+        if abs(member.m_s.data)<1e-1:
+            if not member.is_masked:
+                target_m_idx = member.mlayeridx
+                mask_target_mlayer(target_m_idx,model)
+                break
+        else:
+            break
+
+    return cur_mask_times
+
 
 
 def resrep_get_deps_and_metric_dict(origin_deps, model:nn.Module, pacesetter_dict):

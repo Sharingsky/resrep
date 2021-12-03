@@ -14,6 +14,7 @@ class ConvBuilder(nn.Module):
         self.BN_track_running_stats = True
         self.base_config = base_config
         self.cur_conv_idx = -1
+        self.cur_mask_idx = -1
 
     def set_BN_config(self, eps, momentum, affine, track_running_stats):
         self.BN_eps = eps

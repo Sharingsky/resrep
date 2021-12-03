@@ -84,7 +84,7 @@ if __name__ == '__main__':
         resrep_config = ResRepConfig(target_layers=target_layers, succeeding_strategy=succeeding_strategy,
                                      pacesetter_dict=pacesetter_dict, lasso_strength=1e-4,
                                      flops_func=flops_func, flops_target=0.471, mask_interval=200,
-                                     compactor_momentum=0.99, before_mask_iters=5 * 5000 // batch_size,
+                                     compactor_momentum=0.99, before_mask_iters=5 * 500 // batch_size,
                                      begin_granularity=4, weight_decay_on_compactor=False, num_at_least=1)
 
     else:
@@ -107,7 +107,7 @@ if __name__ == '__main__':
                                      weight_decay_bias=weight_decay_bias, deps=deps)
 
     resrep_builder = LayerPruneBuilder(base_config=config, resrep_config=resrep_config)
-
+    # resrep_builder = ResRepBuilder(base_config=config, resrep_config=resrep_config)
     if resrep_config.weight_decay_on_compactor:
         no_l2_keywords = ['depth']
     else:

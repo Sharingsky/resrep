@@ -37,10 +37,16 @@ class BasicBranch(nn.Module):
         self.conv2 = builder.Conv2dBN(deps[0], deps[1], kernel_size=3, stride=1, padding=1)
 
     def forward(self, x):
-        shot1 = self.conv1.shot_conv1(x)
-        x = self.conv1.se_main(x)+shot1
-        shot2 = self.conv2.shot_conv1(x)
-        x = self.conv2.se_main(x)+shot2
+        if hasattr(self.conv1,'shot_conv1'):
+            shot1 = self.conv1.shot_conv1(x)
+            x = self.conv1.se_main(x)+shot1
+        else:
+            x = self.conv1(x)
+        if hasattr(self.conv2,'shot_conv1'):
+            shot2 = self.conv2.shot_conv1(x)
+            x = self.conv2.se_main(x)+shot2
+        else:
+            x = self.conv2(x)
         return x
 
 

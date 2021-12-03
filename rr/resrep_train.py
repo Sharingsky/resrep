@@ -38,23 +38,7 @@ def train_one_step(m_s_dict, resrep_config:ResRepConfig,
     loss = criterion(pred, label)
     loss.backward()
 
-    # compalist = []
-    # for compadata in compactor_mask_dict.items():
-    #     compalist.append(compadata)
-    # for idx,para in enumerate(compalist):
-    #     if idx == len(compalist)-1:
-    #         break
-    #     compactor_param,mask = para
-    #     nex_compactor_param,nex_mask = compalist[idx+1]
-    #
     #TODO 实现魔改的层mask
-    #1.初始化mask为1
-    #2.以bn系数y作为重要性指标进行排序
-    #3.对最不重要的层进行mask，
-    # for compactor_param,layer_mask in my_mask_dict:
-    # for name,ms in m_s_dict.items():
-    #     lasso_grad = abs(ms)
-    #     ms.grad.data.add_(1e-2, lasso_grad)
     for name,value in m_s_dict.items():
         lasso_grad = value.data/(value.data**2)**0.5
         # if
@@ -259,16 +243,21 @@ def resrep_train_main(
             losses = AvgMeter()
             discrip_str = 'Epoch-{}/{}'.format(epoch, cfg.max_epochs)
             pbar.set_description('Train' + discrip_str)
-
+            cur_mask_times=0
             for _ in pbar:
-
+                m_s_dict = get_m_s_dict(model=model)
                 if iteration > resrep_config.before_mask_iters:
                     total_iters_in_compactor_phase = iteration - resrep_config.before_mask_iters
                     if total_iters_in_compactor_phase > 0 and (total_iters_in_compactor_phase % resrep_config.mask_interval == 0):
                         print('update mask at iter ', iteration)#经过一定阶段才会mask
                         # resrep_mask_model(origin_deps=cfg.deps, resrep_config=resrep_config, model=model)#修改了compactor的mask参数
                         # compactor_mask_dict = get_compactor_mask_dict(model=model)
-
+                        # layer_mask_model()
+                        cur_mask_times = get_ms_order(cur_mask_times,model)
+                        '''
+                        1.给m_s的值排个序
+                        2.给最小的m_layer打上mask0，并维护一个已经mask的layer列表
+                        '''
                         unmasked_deps = resrep_get_unmasked_deps(origin_deps=cfg.deps, model=model, pacesetter_dict=resrep_config.pacesetter_dict)
                         engine.log('iter {}, unmasked deps {}'.format(iteration, list(unmasked_deps)))
                         if total_iters_in_compactor_phase == resrep_config.mask_interval:
@@ -284,7 +273,7 @@ def resrep_train_main(
                 if_accum_grad = ((iteration % cfg.grad_accum_iters) != 0)
 
                 train_net_time_start = time.time()
-                m_s_dict = get_m_s_dict(model=model)
+
                 # bn_scale_dict = get_bn_scale(model=model)
                 # acc, acc5, loss = train_one_step(compactor_mask_dict, resrep_config, model, data, label, optimizer,
                 #                                  criterion,
@@ -308,9 +297,9 @@ def resrep_train_main(
                 # if iteration % cfg.tb_iter_period == 0 and engine.world_rank == 0:
 
                 if iteration % cfg.tb_iter_period == 0:
-                    for name, param in model.named_parameters():
-                        if 'compactor' in name:
-                            tb_writer.add_image(name + "_model1", param.clone().reshape(1,param.size()[0],-1).cpu().data.numpy(), iteration)
+                    # for name, param in model.named_parameters():
+                    #     if 'compactor' in name:
+                    #         tb_writer.add_image(name + "_model1", param.clone().reshape(1,param.size()[0],-1).cpu().data.numpy(), iteration)
                     for tag, value in zip(tb_tags, [acc.item(), acc5.item(), loss.item()]):
                         tb_writer.add_scalars(tag, {'Train': value}, iteration)
                     for name,value in m_s_dict.items():

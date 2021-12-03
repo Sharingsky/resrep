@@ -5,16 +5,19 @@ import torch.nn as nn
 import torch
 from rr.compactor import CompactorLayer
 class Mlayer(nn.Module):
-    def __init__(self):
+    def __init__(self,mlayeridx=0):
         super(Mlayer, self).__init__()
         # m_s = torch.ones([1,in_channel,1,1],requires_grad=True)
         m_s = torch.ones(1)
         self.m_s = torch.nn.Parameter(m_s,requires_grad=True)
-        # self.register_parameter('m_scale', self.m_s)
-
+        self.mask =torch.ones(1,dtype=torch.int32).cuda()
+        self.register_buffer('M_mask',self.mask)
+        self.mlayeridx=mlayeridx
+        self.is_masked = False
     def forward(self, input):
-        x = input * self.m_s
+        x = input * self.m_s*self.M_mask
         return x
+
 class LayerPruneBuilder(ConvBuilder):
     def __init__(self, base_config:BaseConfigByEpoch, resrep_config:ResRepConfig, mode='train'):
         super(LayerPruneBuilder, self).__init__(base_config=base_config)
@@ -28,6 +31,7 @@ class LayerPruneBuilder(ConvBuilder):
         assert type(kernel_size) is int
         in_channels = int(in_channels)
         out_channels = int(out_channels)
+        self.cur_mask_idx +=1
 
         if self.mode == 'deploy':
             se = self.Sequential()
@@ -57,7 +61,7 @@ class LayerPruneBuilder(ConvBuilder):
             se_main.add_module('conv', conv_layer)
             bn_layer = self.BatchNorm2d(num_features=out_channels)
             se_main.add_module('bn', bn_layer)
-            se_main.add_module('m_s_layer', Mlayer())
+            se_main.add_module('m_s_layer', Mlayer(self.cur_mask_idx))
             se.add_module('se_main', se_main)
             se.add_module('shot_conv1',nn.Conv2d(in_channels=in_channels,out_channels=out_channels,kernel_size=1,
                                                  stride=stride))
@@ -118,7 +122,6 @@ class LayerMaskBuilder(ConvBuilder):
         assert type(kernel_size) is int
         in_channels = int(in_channels)
         out_channels = int(out_channels)
-
         if self.mode == 'deploy':
             se = self.Sequential()
             se.add_module('conv', super(LayerMaskBuilder, self).Conv2d(in_channels=in_channels, out_channels=out_channels, kernel_size=kernel_size, stride=stride,
