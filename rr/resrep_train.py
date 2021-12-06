@@ -244,6 +244,7 @@ def resrep_train_main(
             discrip_str = 'Epoch-{}/{}'.format(epoch, cfg.max_epochs)
             pbar.set_description('Train' + discrip_str)
             cur_mask_times=0
+            max_mask_times=28
             for _ in pbar:
                 m_s_dict = get_m_s_dict(model=model)
                 if iteration > resrep_config.before_mask_iters:
@@ -253,7 +254,9 @@ def resrep_train_main(
                         # resrep_mask_model(origin_deps=cfg.deps, resrep_config=resrep_config, model=model)#修改了compactor的mask参数
                         # compactor_mask_dict = get_compactor_mask_dict(model=model)
                         # layer_mask_model()
-                        cur_mask_times = get_ms_order(cur_mask_times,model)
+                        if cur_mask_times<max_mask_times:
+                            cur_mask_times = get_ms_order(cur_mask_times,model)
+                            cur_mask_times+=1
                         '''
                         1.给m_s的值排个序
                         2.给最小的m_layer打上mask0，并维护一个已经mask的layer列表
