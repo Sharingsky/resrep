@@ -5,7 +5,7 @@ import torch.nn as nn
 import torch
 from rr.compactor import CompactorLayer
 class Mlayer(nn.Module):
-    def __init__(self,mlayeridx=0):
+    def __init__(self,mlayeridx=0,threshhold=1e-4):
         super(Mlayer, self).__init__()
         # m_s = torch.ones([1,in_channel,1,1],requires_grad=True)
         m_s = torch.ones(1)
@@ -14,8 +14,9 @@ class Mlayer(nn.Module):
         self.register_buffer('M_mask',self.mask)
         self.mlayeridx=mlayeridx
         self.is_masked = False
+        self.threshhold=threshhold
     def forward(self, input):
-        x = input * self.m_s*self.M_mask
+        x = input * (self.m_s**2/(self.m_s**2+self.threshhold))
         return x
 
 class LayerPruneBuilder(ConvBuilder):

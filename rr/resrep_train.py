@@ -7,6 +7,7 @@ from utils.pyt_utils import ensure_dir
 from utils.misc import torch_accuracy, AvgMeter
 from collections import OrderedDict
 from tqdm import tqdm
+from thop import profile
 import time
 from utils.lr_scheduler import get_lr_scheduler
 import os

@@ -3,7 +3,11 @@ import numpy as np
 import torch.nn.functional as F
 import torch
 from utils.misc import save_hdf5
-
+# def _fuse_msmask():
+#     #1.给定模型参数字典
+#     #2.被剪枝层的参数丢弃
+#     #3.把被剪枝后的1*1旁路融合进前一层
+#     #4.改变前向表
 def _fuse_kernel(kernel, gamma, running_var, eps):
     print('fusing: kernel shape', kernel.shape)
     if kernel.shape[3]==1:

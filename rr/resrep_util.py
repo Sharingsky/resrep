@@ -52,8 +52,6 @@ def get_ms_order(cur_mask_times,model:nn.Module):
 
     return cur_mask_times
 
-
-
 def resrep_get_deps_and_metric_dict(origin_deps, model:nn.Module, pacesetter_dict):
     new_deps = np.array(origin_deps)
     layer_ones, metric_dict = resrep_get_layer_mask_ones_and_metric_dict(model)
