@@ -34,7 +34,7 @@ class ImageNetBlankGenerator(object):
 
     def __next__(self):
         return self.return_dict
-
+''''''
 def create_dataset(dataset_name, subset, global_batch_size, distributed):
     assert dataset_name in ['cifar10','imagenet_blank',
                             'imagenet_standard', 'mnist']
