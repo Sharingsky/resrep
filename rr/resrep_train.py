@@ -34,14 +34,15 @@ DEPS = rc_origin_deps_flattened(9)
 def train_one_step(resrep_config:ResRepConfig,
                    net, data, label, optimizer, criterion, if_accum_grad = False,
                    gradient_mask_tensor = None,criterion2=None,mid_feature=None,idx=None):
-    # pred = net(data)#原网络
+    pred = net(data)#原网络.
     # mid_feature2=pred
     mid_feature=mid_feature
     criterion2=criterion2
-    mid_feature2,pred=get_fea_out_dic2(model=net,data=data,idx=idx)
-    criten =COSFEATURE()
+    # mid_feature2,pred=get_fea_out_dic2(model=net,data=data,idx=idx)
+    criten =DML()
     # print(mid_feature.size())
-    loss= criten(mid_feature[0],mid_feature2[0])
+    loss= criten(pred,mid_feature)
+
     # m_slist = []
     # for name,value in m_s_dict.items():
     #     m_slist.append(abs(value))
@@ -64,8 +65,8 @@ def train_one_step(resrep_config:ResRepConfig,
             for name, param in net.named_parameters():
                 if name in gradient_mask_tensor:
                     param.grad = param.grad * gradient_mask_tensor[name]
-        optimizer.step()
-        optimizer.zero_grad()
+    optimizer.step()
+    optimizer.zero_grad()
     acc, acc5 = torch_accuracy(pred, label, (1,5))
     # acc=0
     # acc5=0
@@ -113,19 +114,19 @@ def get_optimizer(cfg, resrep_config, model, no_l2_keywords, use_nesterov=False,
 
 def get_criterion(cfg):
     return CrossEntropyLoss()
-def calculate_run_flops(model:nn.Module):
-    result = []
-    idxx = -1
-    hdic=[32]*19+[16]*19+[8]*19
-    for child_model in model.modules():
-        if type(child_model)==Mlayer:
-            if child_model.mask>0.9:
-                idxx += 1
-                result.append(calculate_res56_block_flops(DEPS[2*idxx],DEPS[2*idxx+1],DEPS[2*idxx+2],hdic[2*idxx],hdic[2*idxx]))
-            else :
-                result.append(
-                    calculate_mobv3_block_flops(DEPS[2 * idxx], DEPS[2 * idxx + 1], DEPS[2 * idxx + 2], hdic[2*idxx], hdic[2*idxx]))
-    return np.sum(result)
+# def calculate_run_flops(model:nn.Module):
+#     result = []
+#     idxx = -1
+#     hdic=[32]*19+[16]*19+[8]*19
+#     for child_model in model.modules():
+#         if type(child_model)==Mlayer:
+#             if child_model.mask>0.9:
+#                 idxx += 1
+#                 result.append(calculate_res56_block_flops(DEPS[2*idxx],DEPS[2*idxx+1],DEPS[2*idxx+2],hdic[2*idxx],hdic[2*idxx]))
+#             else :
+#                 result.append(
+#                     calculate_mobv3_block_flops(DEPS[2 * idxx], DEPS[2 * idxx + 1], DEPS[2 * idxx + 2], hdic[2*idxx], hdic[2*idxx]))
+#     return np.sum(result)
 
 def get_fea_out_dic1(model,data,idx):
     features_out_hook = []
@@ -137,17 +138,17 @@ def get_fea_out_dic1(model,data,idx):
         __getattr__('block{}'.format(idx%9)).__getattr__('conv2').register_forward_hook(hook)
     out = model(data)
     handle.remove()
-    return features_out_hook
+    return features_out_hook,out
 def get_fea_out_dic2(model,data,idx):
     features_out_hook = []
     idx=idx
     def hook(module, fea_in, fea_out):
         features_out_hook.append(fea_out.clone())
         return None
-    handle=model.__getattr__('stage{}'.format(1+idx//9)).\
-        __getattr__('block{}'.format(idx%9)).__getattr__('mob1branch').register_forward_hook(hook)
+    # handle=model.__getattr__('stage{}'.format(1+idx//9)).\
+    #     __getattr__('block{}'.format(idx%9)).__getattr__('mob1branch').register_forward_hook(hook)
     out = model(data)
-    handle.remove()
+    # handle.remove()
     return features_out_hook,out
 def resrep_train_main(
         local_rank,
@@ -172,10 +173,10 @@ def resrep_train_main(
         # ----------------------------- build model ------------------------------
         if net is None:
 
-            net_fn = get_model_fn(cfg.dataset_name, cfg.network_type)
-            model = net_fn(cfg, resrep_builder,mask_lis=[0]+[1]*26)#上一行最后return SRCNet需要cfg和builder参数
+            net_fn = get_model_fn(cfg.dataset_name, cfg.network_type,mask_lis=mask_lis)
+            model = net_fn(cfg, resrep_builder,mask_lis=mask_lis)#上一行最后return SRCNet需要cfg和builder参数
                                                 #这里的builder和base的builder不一样
-            model_no_mask = net_fn(cfg, resrep_builder,mask_lis=[1] * 27)
+            model_no_mask = net_fn(cfg, resrep_builder,mask_lis=[1]*27)
         else:
             model = net
             net_fn = get_model_fn(cfg.dataset_name, cfg.network_type)
@@ -255,7 +256,8 @@ def resrep_train_main(
         for name,param in model.named_parameters():
             if not 'mob1branch' in name and not 'm_s' in name:
                 param.requires_grad=False
-
+            if 'linear' in name:
+                param.requires_grad=True
         for name,param in model_no_mask.named_parameters():
             if not 'mob1branch' in name and not 'm_s' in name:
                 param.requires_grad=False
@@ -285,28 +287,29 @@ def resrep_train_main(
             if epoch%(cfg.max_epochs//30)==0 and idx < 26:
                 idx += 1
                 # 保存模型参数
-                torch.save(model.state_dict(), 'model_params.pth')
-                model = net_fn(cfg, resrep_builder, mask_lis=[0] * (idx+1) + [1] * (26- idx))
-
-                # 加载模型参数
-
-
-                model.load_state_dict(torch.load('model_params.pth'))
-                model = model.cuda()
+                # model = net_fn(cfg, resrep_builder, mask_lis=np.bitwise_or([0] * idx + [1] * (27 - idx), mask_lis))
+                # torch.save(model.state_dict(), 'model_params.pth')
+                # # # 加载模型参数
+                # #
+                # #
+                # model.load_state_dict(torch.load('model_params.pth'))
+                # model = model.cuda()
                 for name, param in model.named_parameters():
                     if not 'mob1branch' in name and not 'm_s' in name:
                         param.requires_grad = False
+                    if 'linear' or 'projection' in name:
+                        param.requires_grad = True
                     if idx==0:
                         continue
-                    elif 'stage{}.block{}'.format(idx//9+1,(idx-1)%9) in name:
-                        param.requires_grad =False
+                    # elif 'stage{}.block{}'.format(idx//9+1,(idx-1)%9) in name:
+                    #     param.requires_grad =False
 
 
-            # if epoch == 0 and engine.local_rank == 0:
-            #     val_during_train(epoch=epoch, iteration=iteration, tb_tags=tb_tags, engine=engine, model=model,
-            #                  val_data=val_data, criterion=criterion,
-            #                      descrip_str='Begin',
-            #                  dataset_name=cfg.dataset_name, test_batch_size=TEST_BATCH_SIZE, tb_writer=tb_writer)
+            if epoch == 0 and engine.local_rank == 0:
+                val_during_train(epoch=epoch, iteration=iteration, tb_tags=tb_tags, engine=engine, model=model,
+                             val_data=val_data, criterion=criterion,
+                                 descrip_str='Begin',
+                             dataset_name=cfg.dataset_name, test_batch_size=TEST_BATCH_SIZE, tb_writer=tb_writer)
 
             if engine.distributed and hasattr(train_data, 'train_sampler'):
                 train_data.train_sampler.set_epoch(epoch)
@@ -344,7 +347,7 @@ def resrep_train_main(
                         1.计算flops
                         
                         '''
-                        print('='*20+'run_flops{}'.format(calculate_run_flops(model))+'='*20)
+                        # print('='*20+'run_flops{}'.format(calculate_run_flops(model))+'='*20)
                         unmasked_deps = resrep_get_unmasked_deps(origin_deps=cfg.deps, model=model, pacesetter_dict=resrep_config.pacesetter_dict)
                         engine.log('iter {}, unmasked deps {}'.format(iteration, list(unmasked_deps)))
                         if total_iters_in_compactor_phase == resrep_config.mask_interval:
@@ -364,11 +367,11 @@ def resrep_train_main(
                 # m_s_dict = get_m_s_dict(model=model)
 
                 #TODO:model_no_mask进行前向并获取相应的feature
-                fea_out_dic = get_fea_out_dic1(model=model_no_mask,data=data,idx=idx)
+                out1 = get_fea_out_dic1(model=model_no_mask,data=data,idx=idx)[1]
                 # fea_out_dic= model_no_mask(data)
                 acc, acc5, loss = train_one_step(resrep_config, model, data, label, optimizer,
                                                                                   criterion,
-                                                                                  if_accum_grad, gradient_mask_tensor=gradient_mask_tensor,criterion2=criterion2,mid_feature=fea_out_dic,idx=idx)
+                                                                                  if_accum_grad, gradient_mask_tensor=gradient_mask_tensor,criterion2=criterion2,mid_feature=out1,idx=idx)
 
                 train_net_time_end = time.time()
 

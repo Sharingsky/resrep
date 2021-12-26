@@ -11,8 +11,8 @@ https://github.com/kuangliu/pytorch-cifar/blob/master/models/resnet.py
 import torch.nn as nn
 from builder import ConvBuilder
 from constantsa import RESNET50_ORIGIN_DEPS_FLATTENED, resnet_bottleneck_origin_deps_flattened, rc_origin_deps_flattened
-
-
+import torch
+mobbranch_idx=-1
 class BottleneckBranch(nn.Module):
 
     def __init__(self, builder:ConvBuilder, in_channels, deps, stride=1):
@@ -30,24 +30,28 @@ class BottleneckBranch(nn.Module):
 
 class BasicBranch(nn.Module):
 
-    def __init__(self, builder:ConvBuilder, in_channels, deps, stride=1):
+    def __init__(self, builder:ConvBuilder, in_channels, deps, stride=1,mask_lis=None):
         super(BasicBranch, self).__init__()
         assert len(deps) == 2
         self.conv1 = builder.Conv2dBNReLU(in_channels, deps[0], kernel_size=3, stride=stride, padding=1)
         self.conv2 = builder.Conv2dBN(deps[0], deps[1], kernel_size=3, stride=1, padding=1)
-
+        global mobbranch_idx
+        mobbranch_idx+=1
+        mobbranch_idx=mobbranch_idx%27
+        if hasattr(builder,'Mob1Block'):
+            self.mob1branch = builder.Mob1Block(kernel_size=3, in_channels=in_channels,out_channels=deps[1]
+                  ,stride=stride)
+            self.m_layer = builder.mlayer(layer_idx=mobbranch_idx,mask_data=mask_lis[mobbranch_idx])
     def forward(self, x):
-        if hasattr(self.conv1,'shot_conv1'):
-            shot1 = self.conv1.shot_conv1(x)
-            x = self.conv1.se_main(x)+shot1
-        else:
-            x = self.conv1(x)
-        if hasattr(self.conv2,'shot_conv1'):
-            shot2 = self.conv2.shot_conv1(x)
-            x = self.conv2.se_main(x)+shot2
+        mobshot=None
+        if hasattr(self,'mob1branch'):
+            mobshot = self.mob1branch(x)
+        x = self.conv1(x)
+        if hasattr(self,'mob1branch'):
+            x = self.m_layer(self.conv2(x))+(1-self.m_layer.mask)*mobshot
         else:
             x = self.conv2(x)
-        return x
+        return x,mobshot
 
 
 class ResNetBottleneckStage(nn.Module):
@@ -89,7 +93,7 @@ class ResNetBasicStage(nn.Module):
 
     #   stage_deps:     3n+1 (first is the projection),  n is the num of blocks
 
-    def __init__(self, builder:ConvBuilder, in_planes, stage_deps, stride=1, is_first=False):
+    def __init__(self, builder:ConvBuilder, in_planes, stage_deps, stride=1, is_first=False,mask_lis=None):
         super(ResNetBasicStage, self).__init__()
         print('building stage: in {}, deps {}'.format(in_planes, stage_deps))
         self.num_blocks = len(stage_deps) // 2
@@ -119,19 +123,19 @@ class ResNetBasicStage(nn.Module):
             block_stride = stride if i == 0 else 1
             self.__setattr__('block{}'.format(i), BasicBranch(builder=builder,#主要是建了一个branch
                             in_channels=in_c, deps=stage_deps[1 + i*2: 3 + i*2],
-                            stride=block_stride))
+                            stride=block_stride,mask_lis=mask_lis))
 
     def forward(self, x):
         if hasattr(self, 'conv1'):
             base_out = self.relu(self.align_opr(self.conv1(x)))
-            out = base_out + self.align_opr(self.block0(base_out))
+            out = base_out + self.align_opr(self.block0(base_out)[0])
         else:
             proj = self.align_opr(self.projection(x))
-            out = proj + self.align_opr(self.block0(x))
+            out = proj + self.align_opr(self.block0(x)[0])
 
         out = self.relu(out)
         for i in range(1, self.num_blocks):
-            out = out + self.align_opr(self.__getattr__('block{}'.format(i))(out))
+            out = out + self.align_opr(self.__getattr__('block{}'.format(i))(out)[0])
             out = self.relu(out)
         return out
 
@@ -211,7 +215,7 @@ class SBottleneckResNet(nn.Module):
 
 class SRCNet(nn.Module):
 
-    def __init__(self, block_counts, num_classes, builder:ConvBuilder, deps):
+    def __init__(self, block_counts, num_classes, builder:ConvBuilder, deps,mask_lis=None):
         super(SRCNet, self).__init__()
         self.bd = builder
         assert block_counts[0] == block_counts[1]
@@ -224,11 +228,11 @@ class SRCNet(nn.Module):
         filters_per_stage = len(deps) // 3
 
         self.stage1 = ResNetBasicStage(builder=builder, in_planes=3,
-                                       stage_deps=deps[0:filters_per_stage], stride=1, is_first=True)
+                                       stage_deps=deps[0:filters_per_stage], stride=1, is_first=True,mask_lis=mask_lis)
         self.stage2 = ResNetBasicStage(builder=builder, in_planes=deps[filters_per_stage - 1],
-                                       stage_deps=deps[filters_per_stage : 2 * filters_per_stage], stride=2)
+                                       stage_deps=deps[filters_per_stage : 2 * filters_per_stage], stride=2,mask_lis=mask_lis)
         self.stage3 = ResNetBasicStage(builder=builder, in_planes=deps[2 * filters_per_stage - 1],
-                                       stage_deps=deps[2 * filters_per_stage :], stride=2)
+                                       stage_deps=deps[2 * filters_per_stage :], stride=2,mask_lis=mask_lis)
         self.gap = self.bd.GAP(kernel_size=8)
         self.linear = self.bd.Linear(in_features=deps[-1], out_features=num_classes)
 
@@ -250,8 +254,8 @@ def create_SResNet101(cfg, builder):
 def create_SResNet152(cfg, builder):
     return SBottleneckResNet(builder, [3,8,36,3], num_classes=1000, deps=cfg.deps)
 
-def create_SRC56(cfg, builder):
-    return SRCNet(block_counts=[9, 9, 9], num_classes=10, builder=builder, deps=cfg.deps)
+def create_SRC56(cfg, builder,mask_lis):
+    return SRCNet(block_counts=[9, 9, 9], num_classes=10, builder=builder, deps=cfg.deps,mask_lis=mask_lis)
 
 def create_SRC110(cfg, builder):
     return SRCNet(block_counts=[18, 18, 18], num_classes=10, builder=builder, deps=cfg.deps)

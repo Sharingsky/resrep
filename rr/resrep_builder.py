@@ -4,7 +4,7 @@ from base_config import BaseConfigByEpoch
 import torch.nn as nn
 import torch
 from rr.compactor import CompactorLayer
-from base_model import mobilenetv3,mobilenetv1
+from base_model import mobilenetv1
 class Mlayer(nn.Module):
     def __init__(self,mlayeridx=0,threshhold=1e-4,mask_data=1):
         super(Mlayer, self).__init__()
@@ -19,21 +19,21 @@ class Mlayer(nn.Module):
         # self.mask = self.m_s**2/(self.m_s**2+self.threshhold)
         x = input * self.mask
         return x
-class Mobv3Builder(ConvBuilder):
-    def __init__(self, base_config:BaseConfigByEpoch, resrep_config:ResRepConfig, mode='train'):
-        super(Mobv3Builder, self).__init__(base_config=base_config)
-        self.resrep_config = resrep_config
-        assert mode in ['train', 'deploy']
-        self.mode = mode
-        self.nolinear = mobilenetv3.hswish()
-        self.semodule = mobilenetv3.SeModule
-    def mlayer(self,layer_idx=None,mask_data=None):
-        return Mlayer(mlayeridx=layer_idx,mask_data=mask_data)
-    def Mob3Block(self, kernel_size, in_channels,  mid_channel,out_channels
-                  ,stride):
-        return mobilenetv3.Mobilev3Block(kernel_size=kernel_size, in_size=in_channels,
-                                 expand_size=mid_channel, out_size=out_channels,
-                                 semodule=self.semodule(out_channels), stride=stride,nolinear=self.nolinear)
+# class Mobv3Builder(ConvBuilder):
+#     def __init__(self, base_config:BaseConfigByEpoch, resrep_config:ResRepConfig, mode='train'):
+#         super(Mobv3Builder, self).__init__(base_config=base_config)
+#         self.resrep_config = resrep_config
+#         assert mode in ['train', 'deploy']
+#         self.mode = mode
+#         self.nolinear = mobilenetv3.hswish()
+#         self.semodule = mobilenetv3.SeModule
+#     def mlayer(self,layer_idx=None,mask_data=None):
+#         return Mlayer(mlayeridx=layer_idx,mask_data=mask_data)
+#     def Mob3Block(self, kernel_size, in_channels,  mid_channel,out_channels
+#                   ,stride):
+#         return mobilenetv3.Mobilev3Block(kernel_size=kernel_size, in_size=in_channels,
+#                                  expand_size=mid_channel, out_size=out_channels,
+#                                  semodule=self.semodule(out_channels), stride=stride,nolinear=self.nolinear)
 class Mobv1Builder(ConvBuilder):
     def __init__(self, base_config:BaseConfigByEpoch, resrep_config:ResRepConfig, mode='train'):
         super(Mobv1Builder, self).__init__(base_config=base_config)
@@ -45,7 +45,7 @@ class Mobv1Builder(ConvBuilder):
         return Mlayer(mlayeridx=layer_idx,mask_data=mask_data)
     def Mob1Block(self, kernel_size, in_channels, out_channels
                   ,stride):
-        return mobilenetv1.MobileV1Block(builder=self,in_planes=in_channels,out_planes=out_channels)
+        return mobilenetv1.MobileV1Block(builder=self,in_planes=in_channels,out_planes=out_channels,stride=stride)
 class LayerPruneBuilder(ConvBuilder):
     def __init__(self, base_config:BaseConfigByEpoch, resrep_config:ResRepConfig, mode='train'):
         super(LayerPruneBuilder, self).__init__(base_config=base_config)

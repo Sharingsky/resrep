@@ -6,9 +6,9 @@ class MobileV1Block(nn.Module):
     '''Depthwise conv + Pointwise conv'''
     def __init__(self, builder:ConvBuilder, in_planes, out_planes, stride=1):
         super(MobileV1Block, self).__init__()
-        self.depthwise = builder.Conv2dBNReLU(in_channels=in_planes, out_channels=in_planes, kernel_size=3,
+        self.depthwise = builder.Conv2dBNReLU(in_channels=in_planes, out_channels=in_planes*2, kernel_size=3,
                                           stride=stride, padding=1, groups=in_planes)
-        self.pointwise = builder.Conv2dBNReLU(in_channels=in_planes, out_channels=out_planes, kernel_size=1,
+        self.pointwise = builder.Conv2dBNReLU(in_channels=in_planes*2, out_channels=out_planes, kernel_size=1,
                                           stride=1, padding=0)
 
     def forward(self, x):

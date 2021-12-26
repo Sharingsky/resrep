@@ -32,7 +32,7 @@ DATASET_TO_MODEL_MAP = {
 
 
 #   return the model creation function
-def get_model_fn(dataset_name, model_name):
+def get_model_fn(dataset_name, model_name,mask_lis=None):
     # print(DATASET_TO_MODEL_MAP[dataset_name.replace('_blank', '_standard')].keys())
     return DATASET_TO_MODEL_MAP[dataset_name.replace('_blank', '_standard')][model_name]
 
