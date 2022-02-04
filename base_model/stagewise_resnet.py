@@ -48,7 +48,7 @@ class BasicBranch(nn.Module):
             mobshot = self.mob1branch(x)
         x = self.conv1(x)
         if hasattr(self,'mob1branch'):
-            x = self.m_layer(self.conv2(x))+(1-self.m_layer.mask)*mobshot
+            x = self.m_layer.mask*self.conv2(x)+(1-self.m_layer.mask)*mobshot
         else:
             x = self.conv2(x)
         return x,mobshot

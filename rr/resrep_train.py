@@ -18,6 +18,7 @@ from rr.resrep_convert import *
 from utils.engine import Engine
 from rr.resrep_scripts import *
 from kd_losses import *
+import torch
 
 TRAIN_SPEED_START = 0.1
 TRAIN_SPEED_END = 0.2
@@ -33,15 +34,21 @@ DEPS = rc_origin_deps_flattened(9)
 #                    gradient_mask_tensor = None):
 def train_one_step(resrep_config:ResRepConfig,
                    net, data, label, optimizer, criterion, if_accum_grad = False,
-                   gradient_mask_tensor = None,criterion2=None,mid_feature=None,idx=None):
-    pred = net(data)#原网络.
+                   gradient_mask_tensor = None,criterion2=None,mid_feature=None,idx=None,fine_tune=None,
+                   fea_out_dic=None):
+    # pred = net(data)#原网络.
     # mid_feature2=pred
     mid_feature=mid_feature
     criterion2=criterion2
-    # mid_feature2,pred=get_fea_out_dic2(model=net,data=data,idx=idx)
-    criten =DML()
+    mid_feature2,pred=get_fea_out_dic2(model=net,data=data,idx=idx)
+    criten =AT(2)
+    criterion=criterion
+    fea_out_dic=fea_out_dic
     # print(mid_feature.size())
-    loss= criten(pred,mid_feature)
+    # if not fine_tune:
+    #     loss= criten(mid_feature2[0],mid_feature[0])
+    # else:
+    loss = criterion(pred,label)
 
     # m_slist = []
     # for name,value in m_s_dict.items():
@@ -114,19 +121,32 @@ def get_optimizer(cfg, resrep_config, model, no_l2_keywords, use_nesterov=False,
 
 def get_criterion(cfg):
     return CrossEntropyLoss()
-# def calculate_run_flops(model:nn.Module):
-#     result = []
-#     idxx = -1
-#     hdic=[32]*19+[16]*19+[8]*19
-#     for child_model in model.modules():
-#         if type(child_model)==Mlayer:
-#             if child_model.mask>0.9:
-#                 idxx += 1
-#                 result.append(calculate_res56_block_flops(DEPS[2*idxx],DEPS[2*idxx+1],DEPS[2*idxx+2],hdic[2*idxx],hdic[2*idxx]))
-#             else :
-#                 result.append(
-#                     calculate_mobv3_block_flops(DEPS[2 * idxx], DEPS[2 * idxx + 1], DEPS[2 * idxx + 2], hdic[2*idxx], hdic[2*idxx]))
-#     return np.sum(result)
+def calculate_run_flops(model:nn.Module):
+    result = []
+    idxx = -1
+    hdic=[32]*19+[16]*19+[8]*19
+    for child_model in model.modules():
+        if type(child_model)==Mlayer:
+            if child_model.mask>0.9:
+                idxx += 1
+                result.append(calculate_res56_block_flops(DEPS[2*idxx],DEPS[2*idxx+1],DEPS[2*idxx+2],hdic[2*idxx],hdic[2*idxx]))
+            else:
+                idxx+=1
+                result.append(
+                    calculate_mobv1_block_flops(in_channel=DEPS[2*idxx],out_channel=DEPS[2*idxx+2],h=hdic[2*idxx]))
+    return np.sum(result)
+def mask_lis2real_mals(mask_lis,idx):
+    times = idx+1
+    new_mask=[1]*27
+    re_idx=1
+    for i,data in enumerate(mask_lis):
+        if data==0:
+            new_mask[i]=0
+            times-=1
+        if times==0:
+            re_idx= i
+            break
+    return new_mask,re_idx
 
 def get_fea_out_dic1(model,data,idx):
     features_out_hook = []
@@ -145,11 +165,23 @@ def get_fea_out_dic2(model,data,idx):
     def hook(module, fea_in, fea_out):
         features_out_hook.append(fea_out.clone())
         return None
-    # handle=model.__getattr__('stage{}'.format(1+idx//9)).\
-    #     __getattr__('block{}'.format(idx%9)).__getattr__('mob1branch').register_forward_hook(hook)
+    handle=model.__getattr__('stage{}'.format(1+idx//9)).\
+        __getattr__('block{}'.format(idx%9)).__getattr__('mob1branch').register_forward_hook(hook)
     out = model(data)
-    # handle.remove()
+    handle.remove()
     return features_out_hook,out
+def covariance(vec1):
+    X=vec1.detach().numpy()
+    return np.cov(X)
+def similarity(metric1,metric2):
+    metric1=torch.Tensor(metric1)
+    metric2=torch.Tensor(metric2)
+    tr = torch.trace(torch.matmul(metric1,metric2))
+    out = tr/(torch.norm(metric1)*torch.norm(metric2))
+    return out
+
+
+
 def resrep_train_main(
         local_rank,
         cfg:BaseConfigByEpoch, resrep_config:ResRepConfig, resrep_builder,
@@ -174,8 +206,9 @@ def resrep_train_main(
         if net is None:
 
             net_fn = get_model_fn(cfg.dataset_name, cfg.network_type,mask_lis=mask_lis)
-            model = net_fn(cfg, resrep_builder,mask_lis=mask_lis)#上一行最后return SRCNet需要cfg和builder参数
+            # model = net_fn(cfg, resrep_builder,mask_lis=mask_lis2real_mals(mask_lis,idx=1)[0])#上一行最后return SRCNet需要cfg和builder参数
                                                 #这里的builder和base的builder不一样
+            model = net_fn(cfg, resrep_builder, mask_lis=mask_lis)
             model_no_mask = net_fn(cfg, resrep_builder,mask_lis=[1]*27)
         else:
             model = net
@@ -253,14 +286,14 @@ def resrep_train_main(
         tb_tags = ['Top1-Acc', 'Top5-Acc', 'Loss']
 
         model.train()
-        for name,param in model.named_parameters():
-            if not 'mob1branch' in name and not 'm_s' in name:
-                param.requires_grad=False
-            if 'linear' in name:
-                param.requires_grad=True
-        for name,param in model_no_mask.named_parameters():
-            if not 'mob1branch' in name and not 'm_s' in name:
-                param.requires_grad=False
+        # for name,param in model.named_parameters():
+        #     if not 'mob1branch' in name and not 'm_s' in name:
+        #         param.requires_grad=False
+        #     if 'linear' in name:
+        #         param.requires_grad=True
+        # for name,param in model_no_mask.named_parameters():
+        #     if not 'mob1branch' in name and not 'm_s' in name:
+        #         param.requires_grad=False
         done_epochs = iteration // iters_per_epoch
         last_epoch_done_iters = iteration % iters_per_epoch
 
@@ -283,24 +316,71 @@ def resrep_train_main(
         compactor_mask_dict = get_compactor_mask_dict(model)
 
         idx = -1
+        re_idx=1
+        dict2compa={}
+        namelist=[]
+        paramlist=[]
+        similarlist=[]
         for epoch in range(done_epochs, cfg.max_epochs):
-            if epoch%(cfg.max_epochs//30)==0 and idx < 26:
-                idx += 1
-                # 保存模型参数
-                # model = net_fn(cfg, resrep_builder, mask_lis=np.bitwise_or([0] * idx + [1] * (27 - idx), mask_lis))
-                # torch.save(model.state_dict(), 'model_params.pth')
-                # # # 加载模型参数
-                # #
-                # #
-                # model.load_state_dict(torch.load('model_params.pth'))
-                # model = model.cuda()
-                for name, param in model.named_parameters():
-                    if not 'mob1branch' in name and not 'm_s' in name:
-                        param.requires_grad = False
-                    if 'linear' or 'projection' in name:
-                        param.requires_grad = True
-                    if idx==0:
+            # if epoch%(cfg.max_epochs//12)==0 and idx < 26:
+            #     idx += 1
+            if epoch==0:
+                for name,param in model.named_parameters():
+                    if 'conv.weight' in name and not 'mob1branch' in name:
+                        dict2compa[name]=param
+                        paramlist.append(param)
+                        namelist.append(name)
+                        print(param.size())
+                        print(1)
+                for i in range(0,len(paramlist)-1,2):
+                    if paramlist[i].size()!=paramlist[i+1].size():
                         continue
+                    metric1=paramlist[i].view(paramlist[i].size()[0],-1).cpu()
+                    metric2 = paramlist[i+1].view(paramlist[i+1].size()[0], -1).cpu()
+                    co_metric1 = covariance(metric1)
+                    co_metric2 = covariance(metric2)
+                    for j in range(i+2,len(paramlist)-1,2):
+                        if paramlist[j].size()==paramlist[j+1].size():
+                            metric3 = paramlist[j].view(paramlist[j].size()[0],-1).cpu()
+                            metric4 = paramlist[j+1].view(paramlist[j+1].size()[0],-1).cpu()
+                            co_metric3 =covariance(metric3)
+                            co_metric4 =covariance(metric4)
+                            if paramlist[i].size()==paramlist[j].size():
+                                similar1 = similarity(co_metric1,co_metric3)
+                                similar2 = similarity(co_metric3,co_metric4)
+                                similar = similar1*similar2
+                                similarlist.append((similar,(i//2,j//2)))
+
+
+                ordered_simi_list=sorted(similarlist,reverse=True)
+                print(1)
+
+                # 保存模型参数
+                # if idx>0:
+                #     torch.save(model.state_dict(), 'model_params.pth')
+                #     # model = net_fn(cfg, resrep_builder, mask_lis=np.bitwise_or([0] * (idx+1) + [1] * (26 - idx), mask_lis))
+                #     masklis,re_idx= mask_lis2real_mals(mask_lis,idx)
+                #     model = net_fn(cfg, resrep_builder, mask_lis=masklis)
+                #     model.load_state_dict(torch.load('model_params.pth'))
+                #     for name, param in model.named_parameters():
+                #         if not 'mob1branch' in name and not 'm_s' in name:
+                #             param.requires_grad = False
+                #         if 'linear' in name:
+                #             param.requires_grad = True
+                #         # for idxx in range(idx):
+                #         #     if 'blcok{}'.format(idxx) in name:
+                #         #         param.requires_grad=False
+                #     model = model.cuda()
+                #     optimizer = get_optimizer(cfg, resrep_config, model,
+                #                               no_l2_keywords=no_l2_keywords, use_nesterov=use_nesterov,
+                #                               keyword_to_lr_mult=keyword_to_lr_mult)
+                #     engine.register_state(
+                #         scheduler=scheduler, model=model, optimizer=optimizer)
+                    # # # 加载模型参数
+                # #
+                # #
+
+
                     # elif 'stage{}.block{}'.format(idx//9+1,(idx-1)%9) in name:
                     #     param.requires_grad =False
 
@@ -325,7 +405,7 @@ def resrep_train_main(
             discrip_str = 'Epoch-{}/{}'.format(epoch, cfg.max_epochs)
             pbar.set_description('Train' + discrip_str)
 
-
+            cur_flops = calculate_run_flops(model)
             for _ in pbar:
 
                 if iteration > resrep_config.before_mask_iters:
@@ -347,7 +427,8 @@ def resrep_train_main(
                         1.计算flops
                         
                         '''
-                        # print('='*20+'run_flops{}'.format(calculate_run_flops(model))+'='*20)
+                        cur_flops = calculate_run_flops(model)
+                        print('='*20+'run_flops{}'.format(calculate_run_flops(model))+'='*20)
                         unmasked_deps = resrep_get_unmasked_deps(origin_deps=cfg.deps, model=model, pacesetter_dict=resrep_config.pacesetter_dict)
                         engine.log('iter {}, unmasked deps {}'.format(iteration, list(unmasked_deps)))
                         if total_iters_in_compactor_phase == resrep_config.mask_interval:
@@ -367,11 +448,16 @@ def resrep_train_main(
                 # m_s_dict = get_m_s_dict(model=model)
 
                 #TODO:model_no_mask进行前向并获取相应的feature
-                out1 = get_fea_out_dic1(model=model_no_mask,data=data,idx=idx)[1]
+                # out1 = get_fea_out_dic1(model=model_no_mask,data=data,idx=re_idx)[0]
                 # fea_out_dic= model_no_mask(data)
+                # if epoch<cfg.max_epochs*0.8:
+                #     acc, acc5, loss = train_one_step(resrep_config, model, data, label, optimizer,
+                #                                                                       criterion,
+                #                                                                       if_accum_grad, gradient_mask_tensor=gradient_mask_tensor,criterion2=criterion2,mid_feature=out1,idx=re_idx,fea_out_dic=fea_out_dic)
+                # else:
                 acc, acc5, loss = train_one_step(resrep_config, model, data, label, optimizer,
-                                                                                  criterion,
-                                                                                  if_accum_grad, gradient_mask_tensor=gradient_mask_tensor,criterion2=criterion2,mid_feature=out1,idx=idx)
+                                                                                          criterion,
+                                                                                          if_accum_grad, gradient_mask_tensor=gradient_mask_tensor,criterion2=criterion2,mid_feature=None,idx=re_idx,fine_tune=True)
 
                 train_net_time_end = time.time()
 
@@ -393,6 +479,7 @@ def resrep_train_main(
                     #         tb_writer.add_image(name + "_model1", param.clone().reshape(1,param.size()[0],-1).cpu().data.numpy(), iteration)
                     for tag, value in zip(tb_tags, [acc.item(), acc5.item(), loss.item()]):
                         tb_writer.add_scalars(tag, {'Train': value}, iteration)
+                    tb_writer.add_scalars('flops',{'train':cur_flops},iteration)
                     for name,param in model.named_parameters():
                         if 'mask' in name:
                             tb_writer.add_scalars(name,{'mask':param},iteration)

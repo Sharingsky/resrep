@@ -63,7 +63,7 @@ if __name__ == '__main__':
         flops_func = calculate_rc56_flops
         init_hdf5 = 'D:/_1work/pycharmcode/pycharmproject/resrep/src56_train/finish.hdf5'
         target_layers = my_rc_internal_layers(9)
-        lrs = LRSchedule(base_lr=0.01, max_epochs=40, lr_epoch_boundaries=None, lr_decay_factor=None,
+        lrs = LRSchedule(base_lr=0.1, max_epochs=40, lr_epoch_boundaries=None, lr_decay_factor=None,
                          linear_final_lr=None, cosine_minimum=0)
         resrep_config = ResRepConfig(target_layers=target_layers, succeeding_strategy=succeeding_strategy,
                                      pacesetter_dict=pacesetter_dict, lasso_strength=1e-4,
@@ -79,7 +79,7 @@ if __name__ == '__main__':
         flops_func = calculate_rc56_flops
         init_hdf5 = 'D:/_1work/pycharmcode/pycharmproject/resrep/src56_train/finish.hdf5'
         target_layers = my_rc_internal_layers(9)
-        lrs = LRSchedule(base_lr=0.6, max_epochs=400, lr_epoch_boundaries=None, lr_decay_factor=None,
+        lrs = LRSchedule(base_lr=1, max_epochs=40, lr_epoch_boundaries=None, lr_decay_factor=None,
                          linear_final_lr=None, cosine_minimum=0)
         resrep_config = ResRepConfig(target_layers=target_layers, succeeding_strategy=succeeding_strategy,
                                      pacesetter_dict=pacesetter_dict, lasso_strength=1e-4,
@@ -118,7 +118,7 @@ if __name__ == '__main__':
     print('######################################################')
 
     # mask_lis = np.random.randint(2, size=27)
-    mask_lis = [0]+[1]*26
+    mask_lis = [0]*27
     if not os.path.exists(os.path.join(config.output_dir,  'finish_converted.hdf5')):
         resrep_train_main(local_rank=start_arg.local_rank,
                           cfg=config, resrep_config=resrep_config, resrep_builder=resrep_builder, show_variables=True,

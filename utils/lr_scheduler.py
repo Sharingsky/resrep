@@ -165,12 +165,33 @@ def get_lr_scheduler(cfg, optimizer):
         assert cfg.lr_decay_factor is None
         if cfg.lr_epoch_boundaries is None:
             print('use cosine decay, the minimum is ', cfg.cosine_minimum)
-            return CosineAnnealingLR(optimizer=optimizer, T_max=cfg.max_epochs * it_ep, eta_min=cfg.cosine_minimum)
+            # return CosineAnnealingLR(optimizer=optimizer, T_max=10, eta_min=cfg.cosine_minimum)
+            return MYCosineLR(optimizer=optimizer, T_max=10, eta_min=cfg.cosine_minimum)
         else:
             assert len(cfg.lr_epoch_boundaries) == 1
             assert cfg.cosine_minimum > 0
             print('use extended cosine decay, the minimum is ', cfg.cosine_minimum)
             return CosineAnnealingExtendLR(optimizer=optimizer, T_cosine_max=cfg.lr_epoch_boundaries[0] * it_ep,
                                            eta_min=cfg.cosine_minimum)
+from torch.optim.lr_scheduler import _LRScheduler
+class MYCosineLR(_LRScheduler):
+    def __init__(self,optimizer, T_max, eta_min=0, last_epoch=-1, verbose=False):
+        self.T_max = T_max
+        self.eta_min = eta_min
+        super(MYCosineLR, self).__init__(optimizer, last_epoch, verbose)
+        self.last_epoch=last_epoch
+    def get_lr(self):
 
+        if self.last_epoch%50< 3:
+            return [0.01*a for a in self.base_lrs]
+            # self.base_lrs
+        elif (self.last_epoch - 1 - self.T_max) % (2 * self.T_max) == 0:
+            return [group['lr'] + (base_lr - self.eta_min) *
+                    (1 - math.cos(math.pi / self.T_max)) / 2
+                    for base_lr, group in
+                    zip(self.base_lrs, self.optimizer.param_groups)]
+        return [(1 + math.cos(math.pi * self.last_epoch / self.T_max)) /
+                (1 + math.cos(math.pi * (self.last_epoch - 1) / self.T_max)) *
+                (group['lr'] - self.eta_min) + self.eta_min
+                for group in self.optimizer.param_groups]
 

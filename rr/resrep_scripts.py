@@ -4,7 +4,11 @@ def get_con_flops(input_deps, output_deps, h, w=None, kernel_size=3, groups=1):
     if w is None:
         w = h
     return input_deps * output_deps * h * w * kernel_size * kernel_size // groups
-
+def calculate_mobv1_block_flops(in_channel,out_channel,h=None):
+    result = []
+    result.append(get_con_flops(input_deps=in_channel,output_deps=in_channel*2,h=h,w=None,groups=in_channel,kernel_size=3))
+    result.append(get_con_flops(input_deps=in_channel*2,output_deps=out_channel,h=h,w=None,groups=in_channel*2,kernel_size=1))
+    return np.sum(result)
 def calculate_mi1_flops(deps):
     assert len(deps) == 27
     for i in range(13):
@@ -65,7 +69,39 @@ def calculate_resnet_bottleneck_flops(fd, resnet_n, original_version=False):
 #   fd : flattened deps
 def calculate_resnet_50_flops(fd):
     return calculate_resnet_bottleneck_flops(fd, 50)
-
+def calculate_res56_block_flops(in_channel,mid_channel,out_channel,h,w):
+    result =[]
+    result.append(get_con_flops(in_channel,mid_channel,h,w,kernel_size=3,groups=1))
+    result.append(get_con_flops(mid_channel, out_channel, h, w, kernel_size=3, groups=1))
+    return np.sum(result)
+def calculate_mobv3_block_flops(in_channel,mid_channel,out_channel,h,w):
+    result = []
+    result.append(get_con_flops(in_channel,mid_channel,h,w,kernel_size=1,groups=1))
+    result.append(get_con_flops(mid_channel,mid_channel,h,w,kernel_size=3,groups=mid_channel))
+    result.append(get_con_flops(mid_channel, out_channel, h, w, kernel_size=1, groups=1))
+    result.append(get_con_flops(in_channel, in_channel//4, h, w, kernel_size=1, groups=1))
+    result.append(get_con_flops(in_channel//4, out_channel, h, w, kernel_size=1, groups=1))
+    return np.sum(result)
+def calculate_mobv3_flops(deps):
+    result = []
+    result.append(get_con_flops(3, deps[0], 32, 32))
+    for i in range(9):
+        result.append(calculate_mobv3_block_flops(deps[2*i],deps[2*i+1],deps[2*i+2],32,32))
+    for i in range(9,18):
+        result.append(calculate_mobv3_block_flops(deps[2*i],deps[2*i+1],deps[2*i+2],16, 16))
+    for i in range(18,27):
+        result.append(calculate_mobv3_block_flops(deps[2*i],deps[2*i+1],deps[2*i+2], 8, 8))
+    return np.sum(result)
+def calculate_my_res56_flops(deps):
+    result = []
+    result.append(get_con_flops(3,deps[0],32,32))
+    for i in range(9):
+        result.append(calculate_res56_block_flops(deps[2*i],deps[2*i+1],deps[2*i+2],32,32))
+    for i in range(9,18):
+        result.append(calculate_res56_block_flops(deps[2*i],deps[2*i+1],deps[2*i+2],16, 16))
+    for i in range(18,27):
+        result.append(calculate_res56_block_flops(deps[2*i],deps[2*i+1],deps[2*i+2], 8, 8))
+    return np.sum(result)
 def calculate_rc_flops(deps, rc_n):
     result = []
     result.append(get_con_flops(3, deps[0], 32, 32))
@@ -96,3 +132,10 @@ def calculate_rc56_flops(deps):
     return calculate_rc_flops(deps, 9)
 def calculate_rc110_flops(deps):
     return calculate_rc_flops(deps, 18)
+if __name__=='__main__':
+    deps = rc_origin_deps_flattened(9)
+    print(deps)
+    print(calculate_rc56_flops(deps))
+    print(calculate_my_res56_flops(deps))
+    print(calculate_mobv3_flops(deps))
+
