@@ -19,21 +19,17 @@ class Mlayer(nn.Module):
         # self.mask = self.m_s**2/(self.m_s**2+self.threshhold)
         x = input * self.mask
         return x
-# class Mobv3Builder(ConvBuilder):
-#     def __init__(self, base_config:BaseConfigByEpoch, resrep_config:ResRepConfig, mode='train'):
-#         super(Mobv3Builder, self).__init__(base_config=base_config)
-#         self.resrep_config = resrep_config
-#         assert mode in ['train', 'deploy']
-#         self.mode = mode
-#         self.nolinear = mobilenetv3.hswish()
-#         self.semodule = mobilenetv3.SeModule
-#     def mlayer(self,layer_idx=None,mask_data=None):
-#         return Mlayer(mlayeridx=layer_idx,mask_data=mask_data)
-#     def Mob3Block(self, kernel_size, in_channels,  mid_channel,out_channels
-#                   ,stride):
-#         return mobilenetv3.Mobilev3Block(kernel_size=kernel_size, in_size=in_channels,
-#                                  expand_size=mid_channel, out_size=out_channels,
-#                                  semodule=self.semodule(out_channels), stride=stride,nolinear=self.nolinear)
+class Vgg_mob_builder(ConvBuilder):
+    def __init__(self, base_config:BaseConfigByEpoch, resrep_config:ResRepConfig, mode='train'):
+        super(Vgg_mob_builder, self).__init__(base_config=base_config)
+        self.resrep_config = resrep_config
+        assert mode in ['train', 'deploy']
+        self.mode = mode
+    def mlayer(self,layer_idx=None,mask_data=None):
+        return Mlayer(mlayeridx=layer_idx,mask_data=mask_data)
+    def Mob1layer(self, kernel_size, in_channels, out_channels
+                  ,stride):
+        return mobilenetv1.MobileV1Block(builder=self,in_planes=in_channels,out_planes=out_channels,stride=stride)
 class Mobv1Builder(ConvBuilder):
     def __init__(self, base_config:BaseConfigByEpoch, resrep_config:ResRepConfig, mode='train'):
         super(Mobv1Builder, self).__init__(base_config=base_config)

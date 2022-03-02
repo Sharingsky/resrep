@@ -37,7 +37,7 @@ class BasicBranch(nn.Module):
         self.conv2 = builder.Conv2dBN(deps[0], deps[1], kernel_size=3, stride=1, padding=1)
         global mobbranch_idx
         mobbranch_idx+=1
-        mobbranch_idx=mobbranch_idx%27
+        mobbranch_idx=mobbranch_idx%36
         if hasattr(builder,'Mob1Block'):
             self.mob1branch = builder.Mob1Block(kernel_size=3, in_channels=in_channels,out_channels=deps[1]
                   ,stride=stride)
@@ -224,7 +224,7 @@ class SRCNet(nn.Module):
             deps = rc_origin_deps_flattened(block_counts[0])#deps：总深度，总共3个stage，这里确定每个stage深度
 
 
-        assert len(deps) == block_counts[0] * 6 + 3
+        # assert len(deps) == block_counts[0] * 6 + 3
         filters_per_stage = len(deps) // 3
 
         self.stage1 = ResNetBasicStage(builder=builder, in_planes=3,
@@ -256,6 +256,10 @@ def create_SResNet152(cfg, builder):
 
 def create_SRC56(cfg, builder,mask_lis):
     return SRCNet(block_counts=[9, 9, 9], num_classes=10, builder=builder, deps=cfg.deps,mask_lis=mask_lis)
+def create_SRC74(cfg, builder,mask_lis):
+    return SRCNet(block_counts=[12, 12, 12], num_classes=10, builder=builder, deps=cfg.deps,mask_lis=mask_lis)
+def create_SRC50(cfg, builder,mask_lis=None):
+    return SRCNet(block_counts=[8, 8, 8], num_classes=10, builder=builder, deps=cfg.deps,mask_lis=mask_lis)
 
 def create_SRC110(cfg, builder):
     return SRCNet(block_counts=[18, 18, 18], num_classes=10, builder=builder, deps=cfg.deps)

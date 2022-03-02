@@ -130,12 +130,15 @@ def calculate_rc_flops(deps, rc_n):
 
 def calculate_rc56_flops(deps):
     return calculate_rc_flops(deps, 9)
+def calculate_rc74_flops(deps):
+    return calculate_rc_flops(deps, 12)
 def calculate_rc110_flops(deps):
     return calculate_rc_flops(deps, 18)
 if __name__=='__main__':
     deps = rc_origin_deps_flattened(9)
     print(deps)
     print(calculate_rc56_flops(deps))
+    # print(calculate_rc74_flops(deps))
     print(calculate_my_res56_flops(deps))
     print(calculate_mobv3_flops(deps))
 

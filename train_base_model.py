@@ -79,7 +79,7 @@ dataset_name=None):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('-a', '--arch', default='src56')
+    parser.add_argument('-a', '--arch', default='src50')
     parser.add_argument('-c', '--conti_or_fs', default='fs')
     parser.add_argument(
         '--local_rank', default=0, type=int,
@@ -104,10 +104,29 @@ if __name__ == '__main__':
         lrs = LRSchedule(base_lr=0.1, max_epochs=240, lr_epoch_boundaries=[120, 180], lr_decay_factor=0.1,
                          linear_final_lr=None, cosine_minimum=None)
 
+    if network_type == 'src74':
+        weight_decay = 1e-4
+        deps = rc_origin_deps_flattened(9)
+        batch_size = 64
+        lrs = LRSchedule(base_lr=0.1, max_epochs=240, lr_epoch_boundaries=[120, 180], lr_decay_factor=0.1,
+                         linear_final_lr=None, cosine_minimum=None)
+
 
     elif network_type == 'vc':
         weight_decay = 1e-4
         deps = VGG_ORIGIN_DEPS
+        batch_size = 64
+        lrs = LRSchedule(base_lr=0.1, max_epochs=240, lr_epoch_boundaries=[120, 180], lr_decay_factor=0.1,
+                         linear_final_lr=None, cosine_minimum=None)
+    elif network_type == 'vgg':
+        weight_decay = 1e-4
+        deps = VGG_ORIGIN_DEPS
+        batch_size = 64
+        lrs = LRSchedule(base_lr=0.1, max_epochs=240, lr_epoch_boundaries=[120, 180], lr_decay_factor=0.1,
+                         linear_final_lr=None, cosine_minimum=None)
+    elif network_type == 'src50':
+        weight_decay = 1e-4
+        deps = rc_origin_deps_flattened(8)
         batch_size = 64
         lrs = LRSchedule(base_lr=0.1, max_epochs=240, lr_epoch_boundaries=[120, 180], lr_decay_factor=0.1,
                          linear_final_lr=None, cosine_minimum=None)

@@ -1,7 +1,7 @@
 import torch.nn as nn
 from builder import ConvBuilder
 
-def _create_vgg_stem(builder, deps):
+def _create_vgg_stem(builder, deps,mask_lis=None):
     sq = builder.Sequential()
     sq.add_module('conv1',
                   builder.Conv2dBNReLU(in_channels=3, out_channels=deps[0], kernel_size=3, stride=1, padding=1))
@@ -38,13 +38,14 @@ def _create_vgg_stem(builder, deps):
 
 class VCNet(nn.Module):
 
-    def __init__(self, num_classes, builder:ConvBuilder, deps):
+    def __init__(self, num_classes, builder:ConvBuilder, deps,mask_lis=None):
         super(VCNet, self).__init__()
-        self.stem = _create_vgg_stem(builder=builder, deps=deps)
+        self.stem = _create_vgg_stem(builder=builder, deps=deps,mask_lis=mask_lis)
         self.flatten = builder.Flatten()
         self.linear1 = builder.IntermediateLinear(in_features=deps[12], out_features=512)
         self.relu = builder.ReLU()
         self.linear2 = builder.Linear(in_features=512, out_features=num_classes)
+        self.mask_lis = mask_lis
 
     def forward(self, x):
         out = self.stem(x)
@@ -93,7 +94,7 @@ class VANet(nn.Module):
         return out
 
 
-def create_vc(cfg, builder):
-    return VCNet(num_classes=10, builder=builder, deps=cfg.deps)
+def create_vc(cfg, builder,mask_lis):
+    return VCNet(num_classes=10, builder=builder, deps=cfg.deps,mask_lis=mask_lis)
 def create_vh(cfg, builder):
     return VCNet(num_classes=100, builder=builder, deps=cfg.deps)

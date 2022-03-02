@@ -10,7 +10,7 @@ print(sys.path)
 from constantsa import *
 from rr.resrep_builder import ResRepBuilder,Mobv1Builder
 from rr.resrep_config import ResRepConfig
-from rr.resrep_train import resrep_train_main
+from rr.resrep_train import resrep_train_main,resrepcopy_train_main
 from base_config import get_baseconfig_by_epoch
 from model_map import get_dataset_name_by_model_name
 from rr.resrep_scripts import *
@@ -22,7 +22,7 @@ from ndp_test import general_test
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('-a', '--arch', default='src56_small')
+    parser.add_argument('-a', '--arch', default='src74')
     parser.add_argument('-c', '--conti_or_fs', default='fs')
     parser.add_argument(
         '--local_rank', default=0, type=int,
@@ -70,6 +70,55 @@ if __name__ == '__main__':
                                      flops_func=flops_func, flops_target=0.471, mask_interval=200,
                                      compactor_momentum=0.99, before_mask_iters=5 * 50000 // batch_size,
                                      begin_granularity=4, weight_decay_on_compactor=False, num_at_least=1)
+    elif network_type == 'src74':
+        weight_decay_strength = 1e-4
+        batch_size = 64
+        deps = rc_origin_deps_flattened(12)
+        succeeding_strategy = rc_succeeding_strategy(12)
+        pacesetter_dict = rc_pacesetter_dict(12)
+        flops_func = calculate_rc56_flops
+        init_hdf5 = 'D:/_1work/pycharmcode/pycharmproject/resrep/src74_train/finish.hdf5'
+        target_layers = my_rc_internal_layers(9)
+        lrs = LRSchedule(base_lr=0.1, max_epochs=100, lr_epoch_boundaries=None, lr_decay_factor=None,
+                         linear_final_lr=None, cosine_minimum=0)
+        resrep_config = ResRepConfig(target_layers=target_layers, succeeding_strategy=succeeding_strategy,
+                                     pacesetter_dict=pacesetter_dict, lasso_strength=1e-4,
+                                     flops_func=flops_func, flops_target=0.471, mask_interval=200,
+                                     compactor_momentum=0.99, before_mask_iters=5 * 50000 // batch_size,
+                                     begin_granularity=4, weight_decay_on_compactor=False, num_at_least=1)
+    elif network_type == 'src50':
+        weight_decay_strength = 1e-4
+        batch_size = 64
+        deps = rc_origin_deps_flattened(8)
+        succeeding_strategy = rc_succeeding_strategy(8)
+        pacesetter_dict = rc_pacesetter_dict(8)
+        flops_func = calculate_rc56_flops
+        init_hdf5 = 'D:/_1work/pycharmcode/pycharmproject/resrep/src74_train/finish.hdf5'
+        target_layers = my_rc_internal_layers(9)
+        lrs = LRSchedule(base_lr=0.1, max_epochs=100, lr_epoch_boundaries=None, lr_decay_factor=None,
+                         linear_final_lr=None, cosine_minimum=0)
+        resrep_config = ResRepConfig(target_layers=target_layers, succeeding_strategy=succeeding_strategy,
+                                     pacesetter_dict=pacesetter_dict, lasso_strength=1e-4,
+                                     flops_func=flops_func, flops_target=0.471, mask_interval=200,
+                                     compactor_momentum=0.99, before_mask_iters=5 * 50000 // batch_size,
+                                     begin_granularity=4, weight_decay_on_compactor=False, num_at_least=1)
+
+    elif network_type == 'vc':
+        weight_decay_strength = 1e-4
+        batch_size = 64
+        deps = rc_origin_deps_flattened(9)
+        succeeding_strategy = rc_succeeding_strategy(9)
+        pacesetter_dict = rc_pacesetter_dict(9)
+        flops_func = calculate_rc56_flops
+        init_hdf5 = 'D:/_1work/pycharmcode/pycharmproject/resrep/vc_train/finish.hdf5'
+        target_layers = my_rc_internal_layers(9)
+        lrs = LRSchedule(base_lr=0.1, max_epochs=40, lr_epoch_boundaries=None, lr_decay_factor=None,
+                         linear_final_lr=None, cosine_minimum=0)
+        resrep_config = ResRepConfig(target_layers=target_layers, succeeding_strategy=succeeding_strategy,
+                                     pacesetter_dict=pacesetter_dict, lasso_strength=1e-4,
+                                     flops_func=flops_func, flops_target=0.471, mask_interval=200,
+                                     compactor_momentum=0.99, before_mask_iters=5 * 50000 // batch_size,
+                                     begin_granularity=4, weight_decay_on_compactor=False, num_at_least=1)
     elif network_type == 'src56_small':
         weight_decay_strength = 1e-4
         batch_size = 64
@@ -106,6 +155,7 @@ if __name__ == '__main__':
                                      tb_dir=log_dir, save_weights=None, val_epoch_period=2, linear_final_lr=lrs.linear_final_lr,
                                      weight_decay_bias=weight_decay_bias, deps=deps)
 
+    # resrep_builder = Mobv1Builder(base_config=config, resrep_config=resrep_config)
     resrep_builder = Mobv1Builder(base_config=config, resrep_config=resrep_config)
     # resrep_builder = ResRepBuilder(base_config=config, resrep_config=resrep_config)
     if resrep_config.weight_decay_on_compactor:
@@ -118,19 +168,24 @@ if __name__ == '__main__':
     print('######################################################')
 
     # mask_lis = np.random.randint(2, size=27)
-    mask_lis = [0]*27
+    mask_lis = [1]*37
+    #[0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 1, 0, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0]
     if not os.path.exists(os.path.join(config.output_dir,  'finish_converted.hdf5')):
         resrep_train_main(local_rank=start_arg.local_rank,
-                          cfg=config, resrep_config=resrep_config, resrep_builder=resrep_builder, show_variables=True,
-                          init_hdf5=init_hdf5,
-                          auto_continue=auto_continue,
-                          no_l2_keywords=no_l2_keywords,mask_lis=mask_lis)
+                      cfg=config, resrep_config=resrep_config, resrep_builder=resrep_builder, show_variables=True,
+                      init_hdf5=init_hdf5,
+                      auto_continue=auto_continue,
+                      no_l2_keywords=no_l2_keywords,mask_lis=mask_lis)
+        # resrep_train_main(local_rank=start_arg.local_rank,
+        #                   cfg=config, resrep_config=resrep_config, resrep_builder=resrep_builder, show_variables=True,
+        #                   init_hdf5=init_hdf5,
+        #                   auto_continue=auto_continue,
+        #                   no_l2_keywords=no_l2_keywords,mask_lis=mask_lis)
 
     # general_test(network_type=network_type,
     #              weights=os.path.join(config.output_dir, 'finish_converted.hdf5'),
     #              builder=ResRepBuilder(base_config=config, resrep_config=resrep_config,
     #                                    mode='deploy'))
-
 
 
 

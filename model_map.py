@@ -13,9 +13,12 @@ CIFAR10_SMALL_MODEL_MAP = {
     'vc':create_vc,
 }
 CIFAR10_MODEL_MAP = {
+    'src50':create_SRC50,
     'src56':create_SRC56,
     'src110':create_SRC110,
+    'src74':create_SRC74,
     'vc':create_vc,
+    'vgg':create_vh,
 }
 
 MNIST_MODEL_MAP = {

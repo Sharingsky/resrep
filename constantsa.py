@@ -58,7 +58,7 @@ import numpy as np
 
 ##################### general Resnet on CIFAR-10
 def rc_origin_deps_flattened(n):
-    assert n in [3, 9, 12, 18, 27, 200]
+    assert n in [3, 8,9, 12, 18, 27, 200]
     filters_in_each_stage = n * 2 + 1
     stage1 = [16] * filters_in_each_stage
     stage2 = [32] * filters_in_each_stage

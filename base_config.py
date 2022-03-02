@@ -36,7 +36,7 @@ def get_baseconfig_by_epoch(network_type, dataset_name, dataset_subset, global_b
 
     return BaseConfigByEpoch(network_type=network_type,dataset_name=dataset_name,dataset_subset=dataset_subset,global_batch_size=global_batch_size,num_node=num_node, device=device,
                       weight_decay=weight_decay,weight_decay_bias=weight_decay_bias,optimizer_type=optimizer_type,momentum=momentum,bias_lr_factor=bias_lr_factor,
-                      max_epochs=max_epochs, base_lr=base_lr, lr_epoch_boundaries=None,lr_decay_factor=None, linear_final_lr=None, cosine_minimum=cosine_minimum,
+                      max_epochs=max_epochs, base_lr=base_lr, lr_epoch_boundaries=lr_epoch_boundaries,lr_decay_factor=lr_decay_factor, linear_final_lr=linear_final_lr, cosine_minimum=cosine_minimum,
                              warmup_epochs=0,warmup_method=warmup_method,warmup_factor=warmup_factor,
                       ckpt_iter_period=int(ckpt_iter_period),tb_iter_period=int(tb_iter_period),
                       output_dir=output_dir, tb_dir=tb_dir,
